@@ -185,6 +185,9 @@ await evalJs(`gushiReader.setView("book")`);
 await sleep(400);
 st = await stateOf();
 check(st.view === "book", `setView("book") 后 view=book`);
+// 默认方向已改为左开本（向右翻）；本段先显式切到右开本，验证右开路径
+await evalJs(`gushiReader.setDirection("right-to-left")`);
+await sleep(300);
 check(await evalJs(`document.body.dataset.view`) === "book", "body[data-view=book] 已挂上");
 check(await evalJs(`getComputedStyle(document.getElementById("book")).display`) === "flex", "翻书层可见");
 check(await evalJs(`getComputedStyle(document.getElementById("track")).visibility`) === "hidden", "连续轨道已隐藏");
