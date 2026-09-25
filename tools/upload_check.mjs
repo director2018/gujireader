@@ -226,18 +226,18 @@ if (!existsSync(pdfPath)) {
 
     check(s.pages === 6, `渲染出 6 页（实际 ${s.pages}）`);
     check(s.title === "demo-book", `书名取自文件名（实际「${s.title}」）`);
-    // 右开本：默认方向下第 1 页应在最右，DOM 从左到右为 末页…第1页
+    // 左开本（默认）：第 1 页在最左，DOM 从左到右为 第1页…末页
     check(
-      s.caps[0] === "第 6 页" && s.caps[5] === "第 1 页",
-      `右开本页序：DOM 从左到右为 第6页…第1页（实际 ${s.caps[0]} … ${s.caps[5]}）`
+      s.caps[0] === "第 1 页" && s.caps[5] === "第 6 页",
+      `左开本页序：DOM 从左到右为 第1页…第6页（实际 ${s.caps[0]} … ${s.caps[5]}）`
     );
     check(
       JSON.stringify(s.srcs.slice().sort((a, b) => a - b)) === JSON.stringify([0, 1, 2, 3, 4, 5]),
       "六页各出现一次，没有重复或缺失"
     );
     check(
-      s.srcs.every((v, i) => s.slots[i] === 5 - v),
-      "右开本映射式 slot = n-1-src 成立"
+      s.srcs.every((v, i) => s.slots[i] === v),
+      "左开本映射式 slot = src 成立"
     );
     check(s.label.replace(/\s/g, "") === "1/6", `页码指示为 1 / 6（实际 ${s.label}）`);
     check(s.firstSrc === "blob:", `页面图片使用本机 blob 地址（实际前缀「${s.firstSrc}」）`);
