@@ -1589,6 +1589,10 @@ function applyFocusState(){
 function setFocusMode(on){
   state.focus = !!on;
   applyFocusState();
+  // 开启瞬间就把聚焦范围摆到正中（用户此前可能自由滚动过）
+  if (state.focus && state.pages.length && !bookMode() && !isZoomed() && track.children.length){
+    alignToCurrent(false);
+  }
   try { localStorage.setItem(FOCUS_KEY, state.focus ? "1" : "0"); } catch(e){}
 }
 
@@ -1598,7 +1602,13 @@ function setFocusScope(scope){
   const changed = state.focusScope !== s;
   state.focusScope = s;
   if (!state.focus) setFocusMode(true);
-  else applyFocusState();
+  else {
+    applyFocusState();
+    // 档位变了，聚焦范围中心也变了，立即重新居中
+    if (changed && state.pages.length && !bookMode() && !isZoomed() && track.children.length){
+      alignToCurrent(false);
+    }
+  }
   try { localStorage.setItem(FOCUS_SCOPE_KEY, s); } catch(e){}
   return changed;
 }
@@ -2236,9 +2246,26 @@ function currentEl(){
 }
 
 function targetX(){
+  const stageW = stage.clientWidth;
+
+  // 聚焦模式：对准聚焦范围（一页，或当前跨的两页）的**整体中心**，
+  // 让"清晰的页"始终停在阅读器正中。
+  // 两页聚焦时翻页若仍以单页为中心，同一跨会在屏上左右小幅挪动；
+  // 以整跨中点定位后，同跨内翻页画面保持稳定，换跨才整体平移一次。
+  if (state.focus){
+    const els = focusPageSet().map((n) => pageEl(Number(n))).filter(Boolean);
+    if (els.length){
+      let lo = Infinity, hi = -Infinity;
+      for (const el of els){
+        lo = Math.min(lo, el.offsetLeft);
+        hi = Math.max(hi, el.offsetLeft + el.offsetWidth);
+      }
+      return -(track.offsetLeft + (lo + hi) / 2 - stageW / 2);
+    }
+  }
+
   const el = currentEl();
   if (!el) return 0;
-  const stageW = stage.clientWidth;
   // 坐标基准要对齐，否则会整整偏出一大截。
   //
   // #track 上有 will-change:transform，它因此成了包含块，于是
