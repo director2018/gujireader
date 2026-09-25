@@ -115,26 +115,26 @@ console.log(`    DOM 上的语义页码: ${bySlot.map((r) => r.src).join("  ")}`
 console.log(`    图片文件名:        ${bySlot.map((r) => r.img).join("  ")}`);
 console.log(`    页标:              ${bySlot.map((r) => r.cap).join(" | ")}\n`);
 
-// --- 右开本：第 1 页（src=0）应占最右格子（slot = n-1）---
+// --- 左开本（默认）：第 1 页（src=0）应占最左格子（slot = src）---
 check(
-  JSON.stringify(bySlot.map((r) => r.src)) === JSON.stringify([5, 4, 3, 2, 1, 0]),
-  "右开本：DOM 从左到右为 末页…第1页（第1页在最右）"
+  JSON.stringify(bySlot.map((r) => r.src)) === JSON.stringify([0, 1, 2, 3, 4, 5]),
+  "左开本：DOM 从左到右为 第1页…末页（第1页在最左）"
 );
 check(
   JSON.stringify(bySlot.map((r) => r.img)) === JSON.stringify(
-    ["00005.png", "00004.png", "00003.png", "00002.png", "00001.png", "00000.png"]),
-  "右开本：图片逆序排布，00000.png 在最右"
+    ["00000.png", "00001.png", "00002.png", "00003.png", "00004.png", "00005.png"]),
+  "左开本：图片正序排布，00000.png 在最左"
 );
 // 页标必须跟着语义页码走，而不是跟随格子号
 check(
   JSON.stringify(bySlot.map((r) => r.cap)) === JSON.stringify(
-    ["第 6 页", "第 5 页", "第 4 页", "第 3 页", "第 2 页", "第 1 页"]),
-  "页标跟随语义页码（最左格显示「第 6 页」，最右格显示「第 1 页」）"
+    ["第 1 页", "第 2 页", "第 3 页", "第 4 页", "第 5 页", "第 6 页"]),
+  "页标跟随语义页码（最左格显示「第 1 页」，最右格显示「第 6 页」）"
 );
-// 每个页面的 slot 与 src 的映射应满足 slot = n-1-src
+// 每个页面的 slot 与 src 的映射应满足 slot = src
 check(
-  rows.every((r) => r.slot === 5 - r.src),
-  "右开本映射式 slot = n-1-src 全部成立"
+  rows.every((r) => r.slot === r.src),
+  "左开本映射式 slot = src 全部成立"
 );
 
 // --- 页码指示与按钮状态 ---
@@ -160,10 +160,10 @@ const sliderM = dom.match(/id="slider"[^>]*max="(\d+)"[^>]*value="(\d+)"/);
 check(!!sliderM && sliderM[1] === "5" && sliderM[2] === "0",
   `进度条范围 0–5，当前 0（实际 ${sliderM ? sliderM[1] + ", " + sliderM[2] : "未解析到"}）`);
 
-// 方向标记
-check(/id="dirRTL"[^>]*aria-pressed="true"/.test(dom), "顶栏「右开本」处于选中态");
-check(/id="dirLTR"[^>]*aria-pressed="false"/.test(dom), "顶栏「左开本」处于未选中态");
-check(/右开本\s*·\s*第1页在右/.test(dom), "底栏显示「右开本 · 第1页在右」");
+// 方向标记（默认左开本）
+check(/id="dirLTR"[^>]*aria-pressed="true"/.test(dom), "顶栏「左开本」处于选中态");
+check(/id="dirRTL"[^>]*aria-pressed="false"/.test(dom), "顶栏「右开本」处于未选中态");
+check(/左开本\s*·\s*第1页在左/.test(dom), "底栏显示「左开本 · 第1页在左」");
 
 // 缩略图按语义页码排列（第1页在最前），共 6 张
 // 同样容许多余属性
