@@ -710,8 +710,8 @@
   <div class="spacer" data-page-node-id="PBHHa7oiEt612NarysRa2t"></div>
 
   <div class="group" role="group" aria-label="装帧方向" data-page-node-id="nKh7rDrTGjsZ4up1df7bLb">
-    <button class="btn" id="dirRTL" aria-pressed="true" title="古籍右开本：第 1 页在最右，自右向左翻页" data-page-node-id="4ezyCjoUUTGvRYr2SjEBGR">右开本</button>
-    <button class="btn" id="dirLTR" aria-pressed="false" title="现代左开本：第 1 页在最左，自左向右翻页" data-page-node-id="MP22XDZuEEOJF2Mqpi8uk1">左开本</button>
+    <button class="btn" id="dirRTL" aria-pressed="false" title="古籍右开本：第 1 页在最右，自右向左翻页" data-page-node-id="4ezyCjoUUTGvRYr2SjEBGR">右开本</button>
+    <button class="btn" id="dirLTR" aria-pressed="true" title="现代左开本：第 1 页在最左，自左向右翻页" data-page-node-id="MP22XDZuEEOJF2Mqpi8uk1">左开本</button>
   </div>
 
   <button class="btn primary" id="btnOpen" title="打开本机的 PDF 或图片（O）" data-page-node-id="mtryXKkJB6he7DZtvndAwD">打开文件</button>
@@ -883,7 +883,7 @@ const DATA_URL = "data/manifest.json";
 
 const state = {
   pages: [],          // 页面数组，下标 0 就是第 1 页
-  dir: "right-to-left",   // 装帧方向：right-to-left(古籍右开) / left-to-right(现代左开)
+  dir: "left-to-right",   // 装帧方向：left-to-right(现代左开，向右翻) / right-to-left(古籍右开)
   idx: 0,             // 当前页码（0 基，0 = 第 1 页）—— 驱动所有 UI
   fitHeight: 0,       // 适应窗口时的页面高度(px)
   zoom: 1,            // 相对适应高度的缩放倍率
@@ -1712,6 +1712,7 @@ function touchCurrentBook(){
   it.page = state.idx + 1;
   it.total = state.pages.length;
   it.dir = state.dir;
+  it.dirUser = !!state.userPickedDir;   // 只有用户手动选过方向，续读时才沿用
   it.theme = state.theme;
   it.at = Date.now();
   writeHistory(list);
@@ -2048,7 +2049,9 @@ async function openHistoryItem(it, row){
       const mf = await res.json();
       applyManifest(mf);
       state.bookId = it.id;
-      if (it.dir) setDirection(it.dir);
+      // 旧记录（dirUser 不存在）一律按新默认（左开本）走；
+      // 用户手动选过方向的书才沿用其选择
+      if (it.dirUser && it.dir) setDirection(it.dir);
       if (it.page > 1) {
         requestAnimationFrame(() => goTo(it.page - 1, false));
       }
@@ -2900,6 +2903,7 @@ async function boot(){
     total: mf.pages.length,
     page: resumePage,
     dir: state.dir,
+    dirUser: !!state.userPickedDir,
     theme: state.theme,
   });
 
@@ -2920,9 +2924,9 @@ function applyManifest(mf, opts){
   state.title = mf.title || "右翻书古籍阅读器";
   state.bookId = o.bookId || "";
   // 优先沿用页面上当前选择的装帧方向（用户可能手动切过），
-  // 其次参考 manifest 记录的方向。
+  // 其次参考 manifest 记录的方向；都没有时默认左开本（向右翻）。
   if (!state.userPickedDir){
-    state.dir = mf.direction === "left-to-right" ? "left-to-right" : "right-to-left";
+    state.dir = mf.direction === "right-to-left" ? "right-to-left" : "left-to-right";
   }
 
   $("bookTitle").textContent = state.title;
@@ -3402,6 +3406,7 @@ async function importFiles(fileList, handles){
       total: pages.length,
       page: resume ? Math.min(resume.page, pages.length) : 1,
       dir: state.dir,
+      dirUser: !!state.userPickedDir,
       theme: state.theme,
     });
 
