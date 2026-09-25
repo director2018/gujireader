@@ -1,0 +1,18 @@
+# Windows 批处理必须是 CRLF：cmd.exe 用 LF 换行时会解析错位，
+# 中文注释行会被当成命令执行（本项目踩过这个坑，务必保留本规则）。
+*.bat text eol=crlf
+*.cmd text eol=crlf
+
+# 其余文本统一 LF
+*.html text eol=lf
+*.mjs  text eol=lf
+*.js   text eol=lf
+*.py   text eol=lf
+*.md   text eol=lf
+*.json text eol=lf
+
+# 二进制：不做换行转换、不参与 diff
+*.png binary
+*.jpg binary
+*.pdf binary
+*.woff2 binary

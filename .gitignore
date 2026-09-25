@@ -1,0 +1,17 @@
+# ---- 无头测试的浏览器 profile：体积大、每次跑测试都会重新生成 ----
+.cdp-profile*/
+tools/.cdp*/
+
+# ---- 测试日志与截图产物 ----
+tools/_diaglog*.txt
+tools/_t_*.txt
+tools/_diag_*.png
+tools/_crop_*.png
+
+# ---- 系统与编辑器 ----
+Thumbs.db
+Desktop.ini
+.DS_Store
+.vscode/
+.idea/
+*.swp

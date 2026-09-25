@@ -1,0 +1,4029 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-page-node-id="OZOqa2t3nUV7No1saldd1J">
+<head data-page-node-id="GYEghnc26Lc0b5XD609iGv">
+<meta charset="UTF-8" data-page-node-id="ARPSORj2kUfnue2XZnAPCT">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" data-page-node-id="4D9fRdBOluEEKuDghZAmSO">
+<title>右翻书古籍阅读器</title>
+<style>
+  /* ============================================================
+     阅读底色主题
+     通过 body[data-theme] 切换。每种主题给出五个色值：
+       底色(bg) / 面板(panel) / 描边(line) / 正文(ink) / 强调(accent)
+     色值都按护眼方向调过：低饱和、低对比、避开纯白与纯黑。
+     ============================================================ */
+  :root{
+    --radius:10px;
+  }
+
+  /* 1. 宣纸 —— 默认，暖白偏黄，最接近古籍用纸 */
+  body[data-theme="paper"]{
+    --bg:#ede8dd; --panel:#fbf9f4; --panel-2:#f4f1e8;
+    --line:#d8d0c0; --line-soft:#e6e0d3;
+    --ink:#2f2a22; --ink-soft:#6d6455; --ink-faint:#9a9081;
+    --accent:#8a5a2b; --accent-soft:#f0e4d4;
+    --paper:#fffdf8; --paper-line:#e3dccb; --paper-line-2:#d6cdba;
+    --shadow:0 1px 2px rgba(60,48,32,.06), 0 8px 24px rgba(60,48,32,.10);
+  }
+
+  /* 2. 豆沙绿 —— 经典护眼色，降低蓝光刺激 */
+  body[data-theme="green"]{
+    --bg:#c7d9c2; --panel:#e4eede; --panel-2:#d8e7d2;
+    --line:#a8bfa2; --line-soft:#bed2b8;
+    --ink:#25301f; --ink-soft:#4f6047; --ink-faint:#7d8f75;
+    --accent:#3f6b35; --accent-soft:#cfe3c8;
+    --paper:#f4faf0; --paper-line:#c4d8be; --paper-line-2:#b3caac;
+    --shadow:0 1px 2px rgba(40,60,35,.07), 0 8px 24px rgba(40,60,35,.12);
+  }
+
+  /* 3. 米黄 —— 柔和暖黄，适合长时间阅读 */
+  body[data-theme="amber"]{
+    --bg:#f2e6c9; --panel:#fdf7e8; --panel-2:#f8efd9;
+    --line:#dcc9a0; --line-soft:#e8dabb;
+    --ink:#3a2f1a; --ink-soft:#6f6041; --ink-faint:#9c8b68;
+    --accent:#9a6d1f; --accent-soft:#f0dfb8;
+    --paper:#fffcf2; --paper-line:#e6d6b4; --paper-line-2:#d9c69f;
+    --shadow:0 1px 2px rgba(80,62,30,.07), 0 8px 24px rgba(80,62,30,.11);
+  }
+
+  /* 4. 青灰 —— 冷调低饱和，夜间或光线偏暖时更舒服 */
+  body[data-theme="slate"]{
+    --bg:#dde3e4; --panel:#f2f6f7; --panel-2:#e7eef0;
+    --line:#c0ccce; --line-soft:#d3dee0;
+    --ink:#242c2e; --ink-soft:#526063; --ink-faint:#849396;
+    --accent:#3d6b74; --accent-soft:#d5e5e8;
+    --paper:#f8fbfb; --paper-line:#cdd9db; --paper-line-2:#bcc9cb;
+    --shadow:0 1px 2px rgba(35,50,55,.06), 0 8px 24px rgba(35,50,55,.10);
+  }
+
+  /* 5. 深褐 —— 暗色主题，纯黑改深褐，夜间不刺眼 */
+  body[data-theme="sepia-dark"]{
+    --bg:#2b2723; --panel:#37322d; --panel-2:#413a34;
+    --line:#544b43; --line-soft:#463f38;
+    --ink:#eae1d3; --ink-soft:#b5a898; --ink-faint:#8a7e70;
+    --accent:#d0a86a; --accent-soft:#4a3f33;
+    --paper:#f0e9dc; --paper-line:#5c534a; --paper-line-2:#4e463e;
+    --shadow:0 1px 2px rgba(0,0,0,.25), 0 8px 24px rgba(0,0,0,.35);
+  }
+
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{height:100%;margin:0}
+  body{
+    background:var(--bg);
+    color:var(--ink);
+    font-family:"Songti SC","SimSun","Noto Serif CJK SC","Source Han Serif SC",
+                "PingFang SC","Microsoft YaHei",system-ui,sans-serif;
+    overflow:hidden;
+    display:flex;flex-direction:column;
+    /* 只过渡具体属性，不要写 background 简写：
+       简写会让计算值在过渡期间被钉在起始色上（无头浏览器里甚至永远不推进），
+       换底色时会看到旧颜色残留。background-color + color 才是正确做法。 */
+    transition:background-color .22s ease,color .22s ease;
+  }
+  /* 主题切换时面板与描边也不要突变 */
+  header,footer,#thumbs{transition:background-color .22s ease,border-color .22s ease}
+
+  /* ---------------- 顶栏 ---------------- */
+  header{
+    flex:0 0 auto;
+    display:flex;align-items:center;gap:12px;
+    padding:8px 14px;
+    background:var(--panel);
+    border-bottom:1px solid var(--line);
+    z-index:30;
+    min-height:48px;
+  }
+  .brand{display:flex;align-items:baseline;gap:9px;min-width:0}
+  .brand .seal{
+    width:24px;height:24px;flex:0 0 auto;border-radius:4px;
+    background:var(--accent);color:#fff;
+    display:grid;place-items:center;
+    font-size:13px;font-weight:700;letter-spacing:0;
+    font-family:"Songti SC","SimSun",serif;
+    box-shadow:0 1px 2px rgba(138,90,43,.35);
+  }
+  #bookTitle{
+    font-size:15px;font-weight:600;letter-spacing:.04em;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:32vw;
+  }
+  #bookMeta{font-size:11.5px;color:var(--ink-faint);white-space:nowrap}
+  .spacer{flex:1 1 auto}
+
+  .btn{
+    appearance:none;border:1px solid var(--line);
+    background:var(--panel-2);color:var(--ink);
+    font:inherit;font-size:12.5px;
+    padding:5px 11px;border-radius:7px;
+    cursor:pointer;white-space:nowrap;
+    transition:background .13s,border-color .13s,color .13s;
+    line-height:1.5;
+  }
+  .btn:hover{background:var(--accent-soft);border-color:#d9c4a6}
+  .btn:active{transform:translateY(.5px)}
+  .btn[aria-pressed="true"]{background:var(--accent-soft);border-color:var(--accent);color:var(--accent);font-weight:600}
+  .btn.ghost{background:transparent}
+  .btn.primary{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:600}
+  .btn.primary:hover{background:#7a4f26;border-color:#7a4f26}
+  .group{display:flex;gap:0;border-radius:7px;overflow:hidden}
+  .group .btn{border-radius:0;border-right-width:0}
+  .group .btn:first-child{border-radius:7px 0 0 7px}
+  .group .btn:last-child{border-radius:0 7px 7px 0;border-right-width:1px}
+
+  /* ---------------- 阅读区 ---------------- */
+  main{
+    flex:1 1 auto;position:relative;overflow:hidden;
+    display:flex;align-items:center;justify-content:center;
+  }
+
+  /* 从右向左的推进轨道：页面横向排列，整体平移 */
+  #track{
+    display:flex;
+    height:100%;
+    align-items:center;
+    gap:28px;
+    padding:22px 0;
+    will-change:transform;
+    transition:transform .38s cubic-bezier(.22,.61,.36,1);
+    transform:translate3d(0,0,0);
+  }
+  #track.instant{transition:none}
+
+  .page{
+    flex:0 0 auto;
+    height:100%;
+    display:flex;align-items:center;justify-content:center;
+  }
+  .page .sheet{
+    position:relative;
+    height:100%;
+    /* 宽度由 JS 按页面原始宽高比预留（见 render / applyScale）。
+       这一点很关键：如果让 <img> 自己撑宽度，图片没下载完时宽度接近 0，
+       整条轨道的宽度、最大滚动量都会算小，滚动条位置随之算错。 */
+    background:var(--paper, #fffdf8);
+    box-shadow:var(--shadow);
+    border:1px solid var(--paper-line, #e3dccb);
+    /* 书页右缘的装订侧阴影，暗示这是右开本 */
+    border-right:1px solid var(--paper-line-2, #d6cdba);
+    overflow:hidden;
+  }
+  .page img{
+    display:block;
+    height:100%;width:100%;
+    /* 预留比例与图片比例一致时正好铺满；万一不一致也只留白、不拉伸 */
+    object-fit:contain;
+  }
+  /* PDF 懒渲染占位：架子已按真实宽高比摆好，中间转圈提示"正在渲染" */
+  .sheet.pending::after,
+  .sheet.failed::after{
+    content:"";
+    position:absolute;left:50%;top:50%;
+    width:26px;height:26px;margin:-13px 0 0 -13px;
+    border:3px solid var(--line-soft);
+    border-top-color:var(--accent);
+    border-radius:50%;
+    animation:pagespin .9s linear infinite;
+  }
+  .sheet.pending::before,
+  .sheet.failed::before{
+    position:absolute;left:0;right:0;top:calc(50% + 26px);
+    text-align:center;font-size:12px;
+    color:var(--ink-faint, var(--line));
+    z-index:1;
+  }
+  .sheet.pending::before{ content:"正在渲染…"; }
+  .sheet.failed::before{ content:"本页渲染失败"; }
+  .sheet.failed::after{ display:none; }
+  @keyframes pagespin{ to{ transform:rotate(360deg); } }
+
+  .page .pnum{
+    position:absolute;left:50%;transform:translateX(-50%);bottom:-19px;
+    font-size:11px;color:var(--ink-faint);white-space:nowrap;
+    letter-spacing:.06em;
+  }
+
+  /* ------------------------------------------------------------------
+     翻书模式（body[data-view="book"] 时生效）
+
+     一屏摊开一「跨」（cross），像一本摊在桌上的书；任何一页都是完整原页。
+       - 对开扫描（宽高比 >= 1.15，一页里印着左右两面书）整张居中独占一屏；
+       - 单页扫描两两配跨：右开本先读页在右、次读页在左（左开本反之），
+         两侧都有纸，书脊落在正中。
+     翻页是一张纸绕书脊转 180° 的 3D 动画，分层从下到上：
+       #bookL / #bookR / #bookFull  静态层：左半张 / 右半张 / 整张对开
+       #bookGutter   书脊阴影（JS 按页面形态摆位置）
+       #bookFlipWrap 翻动层：搬运中的那张纸，正面是它原来那面、背面是翻过去后
+                     该看到的那一页
+     ------------------------------------------------------------------ */
+  #book{
+    position:absolute;inset:0;z-index:10;
+    display:none;align-items:center;justify-content:center;
+    perspective:2400px;
+    background:
+      radial-gradient(130% 100% at 50% 38%, rgba(255,246,224,.07), rgba(0,0,0,.32)),
+      linear-gradient(180deg, #4a3d2f, #2b241d);
+  }
+  body[data-view="book"] #book{ display:flex; }
+  body[data-view="book"] #track{ visibility:hidden; }
+
+  #bookArea{ position:relative; }
+
+  /* 一张摊开的纸。宽高与位置全部由 JS 计算（含对开/单页两种摆法） */
+  .leaf{
+    position:absolute;top:0;z-index:1;
+    background:var(--paper, #fffdf8);
+    box-shadow:0 8px 26px rgba(0,0,0,.5);
+    overflow:hidden;
+  }
+  /* contain：容器尺寸本来就是按原页比例算的，正常填满；
+     万一尺寸信息缺失也不会把书页拉变形，只会留一点纸边 */
+  .leaf img{ display:block;width:100%;height:100%;object-fit:contain; }
+  .leaf.pend::after{
+    content:"";position:absolute;left:50%;top:50%;
+    width:26px;height:26px;margin:-13px 0 0 -13px;
+    border:3px solid rgba(0,0,0,.14);
+    border-top-color:var(--accent, #8a5a2b);
+    border-radius:50%;
+    animation:pagespin .9s linear infinite;
+  }
+  /* 翻书叶子的"本页渲染失败"：连续模式的 .sheet.failed 有提示，
+     翻书模式以前只留一张白纸，用户看不出是坏了还是没加载 —— 补齐 */
+  .leaf.pend-fail::after{
+    content:"本页渲染失败";position:absolute;left:50%;top:50%;
+    transform:translate(-50%,-50%);
+    font-size:13px;letter-spacing:.08em;
+    color:var(--ink-faint, #9a9081);
+    border:1px solid var(--paper-line, #e3dccb);
+    background:var(--paper, #fffdf8);
+    padding:8px 16px;border-radius:8px;
+  }
+  /* 内部错误浮层：真机上出现过本地无法复现的静默故障，
+     任何未捕获异常都亮在这里，不再无声吞掉 */
+  #errToast{
+    position:fixed;top:12px;right:12px;z-index:200;
+    max-width:min(540px,80vw);
+    background:#7a2e2e;color:#fff;
+    font-size:12px;line-height:1.6;
+    padding:9px 14px;border-radius:10px;
+    box-shadow:0 6px 22px rgba(0,0,0,.28);
+    display:none;white-space:pre-wrap;word-break:break-all;
+    cursor:pointer;user-select:none;
+  }
+  #errToast.show{ display:block; }
+
+  /* 入口提示条：双击文件打开、或浏览器不肯把本站数据设为「可持久」时，
+     把「换个地址打开就等于换了个网站」这件事当面说清，
+     而不是等用户发现「最近打开」变空了再纳闷。 */
+  #envBar{
+    position:fixed;left:50%;top:10px;transform:translateX(-50%);
+    z-index:190;max-width:min(780px,92vw);
+    background:var(--paper, #fffdf8);color:var(--ink, #2b2118);
+    border:1px solid rgba(138,90,43,.5);
+    box-shadow:0 6px 22px rgba(0,0,0,.2);
+    font-size:12.5px;line-height:1.7;
+    padding:9px 14px;border-radius:10px;
+    display:none;
+  }
+  #envBar.show{ display:block; }
+  #envBar b{ color:var(--accent, #8a5a2b); }
+  #envBar .x{
+    float:right;margin-left:12px;cursor:pointer;
+    opacity:.55;user-select:none;font-size:15px;line-height:1.2;
+  }
+  #envBar .x:hover{ opacity:1; }
+
+  /* 书脊阴影：JS 决定横向位置与方向，这里只负责画 */
+  #bookGutter{
+    position:absolute;top:-8px;bottom:-8px;z-index:4;
+    pointer-events:none;
+  }
+  #bookGutter.g-spread{
+    background:linear-gradient(90deg,
+      rgba(0,0,0,0) 0%, rgba(0,0,0,.2) 40%, rgba(0,0,0,.32) 50%,
+      rgba(0,0,0,.2) 60%, rgba(0,0,0,0) 100%);
+  }
+  #bookGutter.g-in{
+    background:linear-gradient(90deg, rgba(0,0,0,.26), rgba(0,0,0,0));
+  }
+  #bookGutter.g-out{
+    background:linear-gradient(90deg, rgba(0,0,0,0), rgba(0,0,0,.26));
+  }
+
+  /* 翻动层：正脸是纸的推进侧半张，背脸是纸背 */
+  #bookFlipWrap{
+    position:absolute;top:0;z-index:8;
+    pointer-events:none;
+    transform-style:preserve-3d;
+  }
+  #bookFlipWrap .flip{
+    position:absolute;inset:0;
+    transform-style:preserve-3d;
+    will-change:transform;
+  }
+  #bookFlipWrap.anim .flip{
+    transition:transform .58s cubic-bezier(.32,.08,.34,1);
+  }
+  .flip .face{
+    position:absolute;inset:0;overflow:hidden;
+    backface-visibility:hidden;-webkit-backface-visibility:hidden;
+  }
+  .flip .face.front{
+    background:var(--paper, #fffdf8);
+    box-shadow:0 12px 34px rgba(0,0,0,.55);
+  }
+  .flip .face.front img{ position:absolute;top:0;height:100%; }
+  .flip .face.back{
+    transform:rotateY(180deg);
+    background:linear-gradient(90deg, #efe4cc, #e2d4b6);
+    box-shadow:inset 0 0 40px rgba(0,0,0,.14);
+  }
+  /* 纸背就是翻过去后该看到的那一面书页（古籍扫描件里的下一页） */
+  .flip .face.back img{
+    position:absolute;top:0;height:100%;
+    box-shadow:inset 0 0 30px rgba(0,0,0,.1);
+  }
+
+  /* 翻书模式的页码：压在桌面下缘，浅色字 */
+  #bookNum{
+    position:absolute;bottom:14px;left:50%;transform:translateX(-50%);
+    font-size:12px;letter-spacing:.08em;
+    color:rgba(255,248,235,.72);white-space:nowrap;
+  }
+  body:not([data-view="book"]) #bookNum{ display:none; }
+
+  /* ------------------------------------------------------------------
+     聚焦模式（可选，body[data-focus="1"] 时生效）
+
+     聚焦范围内（.focus-cur，一页或当前跨的两页）保持原样，
+     两侧页面轻微虚化 + 变淡，眼睛自然落在正在读的范围上。
+     虚化只加在 .sheet 上，页码标签 .pnum 在 sheet 外面，保持清晰可读。
+
+     filter 过渡要常驻在 .sheet 上（而不是只在聚焦模式下写）：
+     翻页瞬间"旧当前页变虚、新当前页变清"才有平滑的交叉过渡，
+     否则会在一帧内硬切，看起来像闪了一下。
+     ------------------------------------------------------------------ */
+  .page .sheet{
+    transition:filter .3s ease, opacity .3s ease;
+  }
+  body[data-focus="1"] .page:not(.focus-cur) .sheet{
+    filter:blur(4px) saturate(.85);
+    opacity:.6;
+  }
+
+  /* ------------------------------------------------------------------
+     缩放模式下的滚动方向
+
+     古籍右开本的内容自右向左读，滚动条也应该跟着这个方向：
+     滑块从右端起步，往左拖才是「往后读」。
+
+     这里不用 CSS 花招，走最稳的一条路 —— 保持布局和原生滚动完全正常，
+     只把「滚动条位置」与「内容位置」的对应关系反过来：
+
+       - 容器保持普通 overflow，内容照常从左到右排布（首格是末页，见 laneSlots）
+       - 用 JS 把 stage.scrollLeft 放到最大：滑块停在最右端
+       - 用户往左拖滑块 ⇒ scrollLeft 减小 ⇒ 视野往左移 ⇒ 看到更靠后的页
+       - 滚轮 / 触控板 / 空格键同样处理，方向自动一致
+
+     试过但不可行的两条路，记在这里免得以后重走：
+       - transform:scaleX(-1) 镜像整个轨道：能翻转视觉，但会把
+         scrollWidth 的计算搞乱（实测 scrollWidth 塌陷），且子元素要逐个镜像回来。
+       - direction:rtl 加在滚动容器上：实测 scrollWidth - clientWidth 直接变成 0，
+         内容不再溢出，等于把滚动功能弄没了。
+     两条路都会破坏原生滚动的可靠性，所以最终选择 JS 映射。
+     ------------------------------------------------------------------ */
+  main.zoomed{overflow-x:auto;overflow-y:hidden;align-items:flex-start;justify-content:flex-start}
+  main.zoomed #track{
+    height:auto;min-height:100%;padding:22px 22px 22px 22px;
+    /* 缩放模式下由滚动条负责定位，JS 不要再平移轨道 */
+    transform:none !important;
+    transition:none;
+  }
+  /* 缩放模式下左右两侧的翻页按钮会挡住内容，收起（滚动本身就能翻页） */
+  main.zoomed .nav{opacity:0;pointer-events:none}
+
+  /* ---------------- 左右翻页按钮 ---------------- */
+  .nav{
+    position:absolute;top:50%;transform:translateY(-50%);
+    width:52px;height:96px;
+    display:grid;place-items:center;
+    /* 用 color-mix 跟随主题，深色主题下不会突兀变白 */
+    background:color-mix(in srgb, var(--panel) 86%, transparent);
+    backdrop-filter:blur(6px);
+    border:1px solid var(--line);
+    color:var(--ink-soft);
+    cursor:pointer;z-index:20;
+    transition:background .15s,color .15s,border-color .15s,opacity .2s;
+    user-select:none;
+  }
+  .nav:hover{background:var(--accent-soft);color:var(--accent);border-color:#d9c4a6}
+  .nav:disabled{opacity:.26;cursor:default;background:color-mix(in srgb, var(--panel) 50%, transparent);color:var(--ink-faint);border-color:var(--line-soft)}
+  .nav svg{width:22px;height:22px;display:block}
+  .nav .cap{
+    position:absolute;bottom:7px;font-size:10px;letter-spacing:.1em;
+    font-family:inherit;
+  }
+  #btnPrev{left:18px;border-radius:0 12px 12px 0;border-left:none}
+  #btnNext{right:18px;border-radius:12px 0 0 12px;border-right:none}
+
+  /* ---------------- 底栏 ---------------- */
+  footer{
+    flex:0 0 auto;
+    background:var(--panel);
+    border-top:1px solid var(--line);
+    padding:7px 14px 9px;
+    z-index:30;
+  }
+  .row{display:flex;align-items:center;gap:12px}
+  .row + .row{margin-top:7px}
+
+  input[type=range]{
+    -webkit-appearance:none;appearance:none;
+    flex:1 1 auto;height:22px;background:transparent;cursor:pointer;
+  }
+  input[type=range]::-webkit-slider-runnable-track{
+    height:3px;background:var(--line);border-radius:2px;
+  }
+  input[type=range]::-webkit-slider-thumb{
+    -webkit-appearance:none;appearance:none;
+    width:14px;height:14px;border-radius:50%;
+    background:var(--accent);border:2px solid var(--panel);
+    margin-top:-5.5px;box-shadow:0 1px 3px rgba(0,0,0,.2);
+  }
+  input[type=range]::-moz-range-track{height:3px;background:var(--line);border-radius:2px}
+  input[type=range]::-moz-range-thumb{
+    width:12px;height:12px;border-radius:50%;background:var(--accent);
+    border:2px solid var(--panel);
+  }
+
+  #pageLabel{
+    font-size:12.5px;color:var(--ink-soft);white-space:nowrap;
+    font-variant-numeric:tabular-nums;min-width:88px;text-align:center;
+    letter-spacing:.04em;
+  }
+  #pageLabel b{color:var(--ink);font-size:14px}
+
+  .hint{font-size:11px;color:var(--ink-faint);white-space:nowrap}
+
+  /* 缩略图抽屉 */
+  #thumbs{
+    position:fixed;inset:auto 0 0 0;height:0;overflow:hidden;
+    background:var(--panel);border-top:1px solid var(--line);
+    transition:height .26s ease;z-index:40;
+  }
+  #thumbs.open{height:190px}
+  #thumbStrip{
+    display:flex;gap:10px;padding:14px;overflow-x:auto;height:190px;align-items:center;
+  }
+  #thumbStrip .t{
+    flex:0 0 auto;height:150px;border:2px solid transparent;border-radius:5px;
+    overflow:hidden;cursor:pointer;background:#fff;box-shadow:var(--shadow);
+    transition:border-color .15s,transform .15s;
+  }
+  #thumbStrip .t:hover{transform:translateY(-2px)}
+  #thumbStrip .t.cur{border-color:var(--accent)}
+  #thumbStrip .t img{height:100%;width:auto;display:block}
+
+  /* 弹层 */
+  #overlay{
+    position:fixed;inset:0;background:rgba(40,34,26,.42);
+    display:none;place-items:center;z-index:60;backdrop-filter:blur(2px);
+  }
+  #overlay.open{display:grid}
+  .dialog{
+    background:var(--panel);border:1px solid var(--line);border-radius:12px;
+    padding:20px 22px;min-width:290px;box-shadow:0 18px 50px rgba(50,40,28,.28);
+  }
+  .dialog h3{margin:0 0 14px;font-size:15px;font-weight:600;letter-spacing:.04em}
+  .dialog label{display:block;font-size:12px;color:var(--ink-soft);margin-bottom:6px}
+  .dialog input[type=number]{
+    width:100%;padding:8px 10px;font:inherit;font-size:14px;
+    border:1px solid var(--line);border-radius:7px;background:#fff;color:var(--ink);
+  }
+  .dialog input[type=number]:focus{outline:2px solid var(--accent-soft);border-color:var(--accent)}
+  .dialog .acts{display:flex;gap:9px;justify-content:flex-end;margin-top:16px}
+
+  /* 空状态 */
+  #empty{
+    position:absolute;inset:0;display:none;place-items:center;text-align:center;padding:30px;
+    z-index:1;   /* 压在底色面板之下，面板不打开时互不影响 */
+  }
+  #empty.show{display:grid}
+  #empty .box{max-width:520px}
+  #empty h2{font-size:19px;margin:0 0 10px;letter-spacing:.06em}
+  #empty p{font-size:13px;color:var(--ink-soft);line-height:2;margin:0 0 4px}
+  #empty code{
+    background:var(--panel-2);border:1px solid var(--line-soft);
+    padding:1px 6px;border-radius:5px;font-size:12px;
+    font-family:ui-monospace,Menlo,Consolas,monospace;color:var(--accent);
+  }
+
+  /* 阅读底色选择面板 */
+  #themePanel{
+    position:absolute;top:12px;right:14px;
+    background:var(--panel);border:1px solid var(--line);
+    border-radius:12px;padding:12px 14px;
+    box-shadow:var(--shadow);
+    z-index:45;
+    display:none;
+  }
+  #themePanel.open{display:block}
+  #themePanel .tp-title{
+    font-size:11.5px;color:var(--ink-faint);
+    letter-spacing:.12em;margin-bottom:10px;
+  }
+  #themePanel .tp-list{display:flex;flex-direction:column;gap:6px}
+  #themePanel .tp-item{
+    display:flex;align-items:center;gap:10px;
+    padding:6px 10px 6px 7px;border-radius:8px;
+    border:1px solid transparent;
+    cursor:pointer;white-space:nowrap;
+    transition:background .14s,border-color .14s;
+  }
+  #themePanel .tp-item:hover{background:var(--panel-2)}
+  #themePanel .tp-item.cur{border-color:var(--accent);background:var(--accent-soft)}
+  #themePanel .tp-dot{
+    width:22px;height:22px;border-radius:6px;flex:0 0 auto;
+    border:1px solid var(--line);
+    box-shadow:inset 0 0 0 3px rgba(255,255,255,.45);
+  }
+  #themePanel .tp-name{font-size:12.5px;color:var(--ink)}
+  #themePanel .tp-item.cur .tp-name{font-weight:600;color:var(--accent)}
+  /* 每一项的右侧小字提示，仅在够宽时显示 */
+  #themePanel .tp-hint{
+    font-size:10.5px;color:var(--ink-faint);margin-left:6px;
+    letter-spacing:.02em;
+  }
+
+  /* ------------------------------------------------------------------
+     手抓拖动（抓握平移）
+
+     缩放后页面比窗口大，光靠滚动条不好用。这里允许按住页面直接拖：
+       - 未缩放：拖动是「翻页手势」，超过阈值就翻一页，跟触屏滑动一致
+       - 已缩放：拖动是「平移画布」，按住往哪拖内容就往哪走
+     抓取中把光标换成抓握手型，松手恢复。
+     ------------------------------------------------------------------ */
+  #stage{ cursor:grab; }
+  #stage.grabbing, #stage.grabbing *{ cursor:grabbing; }
+  /* 拖动过程中禁止选中文字与图片拖影 */
+  #stage.dragging{ user-select:none; }
+  #stage.dragging .page img{ pointer-events:none; }
+
+  /* ------------------------------------------------------------------
+     最近打开历史
+
+     与底色面板同一种样式语言，位置略低，避免同时打开时重叠。
+     ------------------------------------------------------------------ */
+  #histPanel{
+    position:absolute;top:12px;right:14px;
+    background:var(--panel);border:1px solid var(--line);
+    border-radius:12px;padding:12px 14px;
+    box-shadow:var(--shadow);
+    z-index:45;
+    display:none;
+    width:320px;max-width:calc(100vw - 28px);
+  }
+  #histPanel.open{display:block}
+  #histPanel .hp-head{
+    display:flex;align-items:center;justify-content:space-between;
+    margin-bottom:10px;
+  }
+  #histPanel .hp-title{
+    font-size:11.5px;color:var(--ink-faint);letter-spacing:.12em;
+  }
+  #histPanel .hp-clear{
+    border:none;background:none;cursor:pointer;
+    font-size:11px;color:var(--ink-faint);
+    padding:2px 6px;border-radius:6px;
+    font-family:inherit;
+  }
+  #histPanel .hp-clear:hover{background:var(--panel-2);color:var(--ink)}
+  #histPanel .hp-list{
+    display:flex;flex-direction:column;gap:4px;
+    max-height:min(52vh, 380px);overflow-y:auto;
+  }
+  #histPanel .hp-item{
+    display:flex;align-items:center;gap:10px;
+    padding:7px 8px;border-radius:8px;
+    border:1px solid transparent;
+    cursor:pointer;
+  }
+  #histPanel .hp-item:hover{background:var(--panel-2)}
+  #histPanel .hp-item.cur{border-color:var(--accent);background:var(--accent-soft)}
+  #histPanel .hp-main{min-width:0;flex:1}
+  #histPanel .hp-name{
+    font-size:12.5px;color:var(--ink);
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  }
+  #histPanel .hp-item.cur .hp-name{font-weight:600;color:var(--accent)}
+  #histPanel .hp-sub{
+    font-size:10.5px;color:var(--ink-faint);margin-top:2px;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  }
+  #histPanel .hp-page{
+    font-size:11px;color:var(--ink-soft);
+    font-family:ui-monospace,Menlo,Consolas,monospace;
+    flex:0 0 auto;
+  }
+  #histPanel .hp-del{
+    flex:0 0 auto;width:20px;height:20px;
+    border:none;background:none;cursor:pointer;
+    border-radius:5px;color:var(--ink-faint);
+    font-size:14px;line-height:1;padding:0;
+    font-family:inherit;
+  }
+  #histPanel .hp-del:hover{background:var(--panel-2);color:var(--ink)}
+  #histPanel .hp-empty{
+    font-size:12px;color:var(--ink-faint);
+    padding:10px 2px;line-height:1.7;
+  }
+  /* 重开历史书籍时的进度条 */
+  #histPanel .hp-item .hp-spin{
+    flex:0 0 auto;width:13px;height:13px;
+    border:2px solid var(--line);border-top-color:var(--accent);
+    border-radius:50%;animation:spin .7s linear infinite;
+  }
+
+  /* 拖放覆盖层 */
+  #dropzone{
+    position:absolute;inset:0;display:none;place-items:center;
+    background:color-mix(in srgb, var(--accent-soft) 88%, transparent);
+    border:3px dashed var(--accent);
+    z-index:55;
+  }
+  #dropzone.on{display:grid}
+  #dropzone .dz-inner{text-align:center;color:var(--accent)}
+  #dropzone .dz-icon svg{width:52px;height:52px;margin-bottom:12px}
+  #dropzone .dz-text{font-size:19px;font-weight:600;letter-spacing:.1em}
+  #dropzone .dz-sub{font-size:12.5px;margin-top:8px;color:#8a6f4e;letter-spacing:.04em}
+
+  /* 解析进度 */
+  #progress{
+    position:absolute;inset:0;display:none;place-items:center;
+    background:color-mix(in srgb, var(--bg) 94%, transparent);z-index:58;
+  }
+  #progress.on{display:grid}
+  #progress .pw{width:280px;text-align:center}
+  #progress .pt{font-size:13.5px;color:var(--ink);margin-bottom:14px;letter-spacing:.05em}
+  #progress .bar{height:4px;background:var(--line);border-radius:2px;overflow:hidden}
+  #progress .bar i{display:block;height:100%;width:0;background:var(--accent);transition:width .2s}
+  #progress .ps{font-size:11.5px;color:var(--ink-faint);margin-top:10px;font-variant-numeric:tabular-nums}
+
+  /* 翻页时的方向提示 */
+  #flash{
+    position:absolute;top:14px;left:50%;transform:translateX(-50%);
+    background:rgba(47,42,34,.82);color:#f6f2e9;
+    font-size:12px;padding:5px 14px;border-radius:20px;
+    opacity:0;transition:opacity .3s;pointer-events:none;z-index:25;
+    letter-spacing:.08em;
+  }
+  #flash.show{opacity:1}
+
+  /* 加载遮罩 */
+  #loading{
+    position:absolute;inset:0;display:none;place-items:center;
+    background:color-mix(in srgb, var(--bg) 72%, transparent);z-index:50;
+  }
+  #loading.show{display:grid}
+  .spin{
+    width:26px;height:26px;border:2.5px solid var(--line);
+    border-top-color:var(--accent);border-radius:50%;
+    animation:spin .8s linear infinite;
+  }
+  @keyframes spin{to{transform:rotate(360deg)}}
+
+  @media (max-width:820px){
+    #bookMeta,.hint{display:none}
+    #bookTitle{max-width:42vw}
+    .nav{width:44px;height:80px}
+    #btnPrev{left:6px}
+    #btnNext{right:6px}
+    #pageLabel{min-width:74px;font-size:12px}
+  }
+</style>
+</head>
+<body data-page-node-id="wIXxmMBrH6WoD0htF9TIoz">
+
+<header data-page-node-id="IfQvIEOHJ7AR5NRnY3qQ0k">
+  <div class="brand" data-page-node-id="MzM6TCEvtxBf907F4cCFTD">
+    <div class="seal" data-page-node-id="KiHj66ZAbKNfMjKKSfLLeC">籍</div>
+    <span id="bookTitle" data-page-node-id="xfdfFDIDFesEF2IYk2KQiK">右翻书古籍阅读器</span>
+    <span id="bookMeta" data-page-node-id="kM2cfm5CIDSzGcsx2AUgSC"></span>
+  </div>
+  <div class="spacer" data-page-node-id="PBHHa7oiEt612NarysRa2t"></div>
+
+  <div class="group" role="group" aria-label="装帧方向" data-page-node-id="nKh7rDrTGjsZ4up1df7bLb">
+    <button class="btn" id="dirRTL" aria-pressed="true" title="古籍右开本：第 1 页在最右，自右向左翻页" data-page-node-id="4ezyCjoUUTGvRYr2SjEBGR">右开本</button>
+    <button class="btn" id="dirLTR" aria-pressed="false" title="现代左开本：第 1 页在最左，自左向右翻页" data-page-node-id="MP22XDZuEEOJF2Mqpi8uk1">左开本</button>
+  </div>
+
+  <button class="btn primary" id="btnOpen" title="打开本机的 PDF 或图片（O）" data-page-node-id="mtryXKkJB6he7DZtvndAwD">打开文件</button>
+  <button class="btn" id="btnFit" title="使页面高度撑满窗口（0）" data-page-node-id="NpLYDVZCvgwRXo8A5h2Ujq">适应窗口</button>
+  <button class="btn" id="btnView" aria-pressed="false" title="翻书模式：像真书一样对开显示、带翻页动画（B）" data-page-node-id="ViewBtnNode001">翻书</button>
+  <div class="group" role="group" aria-label="缩放" data-page-node-id="HJHubHXJd5mSKtcs6YQCAm">
+    <button class="btn" id="btnOut" title="缩小（-）" data-page-node-id="ndOJEqjgHACC8I7BY1Lpqi">−</button>
+    <button class="btn" id="btnIn" title="放大（+）" data-page-node-id="fa8yWepkDh8NrpMVUC3Eg2">＋</button>
+  </div>
+  <button class="btn" id="btnTheme" title="切换阅读底色" data-page-node-id="GZoEyIKAwcOG2SvQpEe9UP">底色</button>
+  <div class="group" role="group" aria-label="聚焦范围" data-page-node-id="FocusGroupNode001">
+    <button class="btn" id="btnFocus" aria-pressed="false" title="聚焦一页：当前读的这一页清晰，两侧虚化变淡（X 键循环：关 → 一页 → 两页）" data-page-node-id="FocusBtnNode001">聚焦1页</button>
+    <button class="btn" id="btnFocus2" aria-pressed="false" title="聚焦两页：当前跨摊开的两页都清晰，两侧虚化变淡（X 键循环切换范围）" data-page-node-id="Focus2BtnNode001">聚焦2页</button>
+  </div>
+  <button class="btn" id="btnHist" title="最近打开（H）" data-page-node-id="SpCWwBso1d10gqE7nbOlrq">最近</button>
+  <button class="btn" id="btnThumbs" title="显示缩略图" data-page-node-id="G0dkyg643jkwAncqHWeoYB">缩略图</button>
+  <button class="btn" id="btnGo" title="跳转到指定页（G）" data-page-node-id="dEJuzuSCdkHOkWHC31YF3w">跳转</button>
+  <button class="btn" id="btnFull" title="全屏（F）" data-page-node-id="tzXcNwFRmY703DEPgdwSA3">全屏</button>
+</header>
+
+<main id="stage" data-page-node-id="56yLDIEPOuLMWgjzUbAlzg">
+  <div id="track" data-page-node-id="ATN8ApwkRfEqlsoDDBGvVE"></div>
+
+  <!-- 翻书模式：深色桌面 + 摊开的一跨 + 3D 翻页动画。
+       一屏摊开一「跨」：对开扫描（一页里本来印着左右两面书）整张居中
+       独占一屏；单页扫描两两配跨，右开本先读页在右、次读页在左 ——
+       两侧都有纸，像真书摊在桌上。任何一页都保持完整，不裁不拆。
+       静态层三个槽位：左半张 / 整张对开 / 右半张；翻动层搬运先读侧那张
+       纸，正面是它原来那面、背面是翻过去后该露出的那一页。
+       详见 crosses / planCross / layoutBook / bookFlip。 -->
+  <div id="book">
+    <div id="bookArea">
+      <div class="leaf" id="bookL"></div>
+      <div class="leaf" id="bookFull"></div>
+      <div class="leaf" id="bookR"></div>
+      <div id="bookGutter"></div>
+      <div id="bookFlipWrap"><div class="flip"><div class="face front"></div><div class="face back"></div></div></div>
+    </div>
+    <div id="bookNum"></div>
+  </div>
+
+  <!-- 翻页按钮：左右两侧，箭头指向即页面推进方向，配合右开本使用 -->
+  <button class="nav" id="btnPrev" title="上一页（← 或 A）" aria-label="上一页" data-page-node-id="CkG6CFVdER0GJUuF9LCQFN">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+         stroke-linecap="round" stroke-linejoin="round" data-page-node-id="bYHDZZgk00sDWFiizRZKVR"><path d="M15 5 8 12l7 7" data-page-node-id="GMNFcSvfzlVPevYG1xvA9y"/></svg>
+    <span class="cap" data-page-node-id="Dy5FD1eBg8KYrfRtMRuqdg">上一页</span>
+  </button>
+  <button class="nav" id="btnNext" title="下一页（→ 或 D）" aria-label="下一页" data-page-node-id="55xfhmWmifTHgK9YIWTb9W">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+         stroke-linecap="round" stroke-linejoin="round" data-page-node-id="IRA5VaxDsjUrrXS1TxbILt"><path d="M9 5l7 7-7 7" data-page-node-id="PkjGwW4F7sJDVoHEiUPN7Q"/></svg>
+    <span class="cap" data-page-node-id="ezF6kGFtBHYHSGzuxsmLV5">下一页</span>
+  </button>
+
+  <div id="flash" data-page-node-id="GdlgN1I7CkLM27AXkzLhFt"></div>
+  <div id="errToast" title="点击关闭"></div>
+  <div id="envBar"></div>
+
+  <div id="loading" data-page-node-id="wGACC7HsvuKz9GIrctTiv4"><div class="spin" data-page-node-id="HxDk6Net0t9wkRFE9VIckF"></div></div>
+
+  <div id="progress" data-page-node-id="KJo5kWF4qdEkmqwCwycDww">
+    <div class="pw" data-page-node-id="A3tOunm1v4RTJU8TGktxmw">
+      <div class="pt" id="progText" data-page-node-id="QyTsj7iH1ABaE6gQ4BPVj0">正在解析…</div>
+      <div class="bar" data-page-node-id="VPYWT9ExUvW0S4D4WEyECi"><i id="progBar" data-page-node-id="TudkAVxUUV72s6nGh7tcRN"></i></div>
+      <div class="ps" id="progSub" data-page-node-id="h5fNhUkST5SkIFv2beCGON"></div>
+    </div>
+  </div>
+
+  <input type="file" id="fileInput" accept=".pdf,image/*" multiple hidden data-page-node-id="oLzvHbeH5O0J6ca3qtg9gW">
+
+  <div id="empty" data-page-node-id="ZZvRQlhcjym3LysPQx6db0">
+    <div class="box" data-page-node-id="6PfmzLZZZsBisG9C5hCYDM">
+      <h2 data-page-node-id="311avOpsHAaCNWQRsEfQBe">把你的古籍拖进来</h2>
+      <p data-page-node-id="f4zqFmGfTK4E9V9fLZcEZN">直接把 <b data-page-node-id="xeN1UgfcFAgLYW4gdOi6e6">PDF</b> 或页面图片拖到窗口任意位置即可开始阅读。</p>
+      <p data-page-node-id="BB28zomgb9Y08GTfbv9vAH">也可以点击上方的 <b data-page-node-id="KBkDhaS66GMpyrjmQYsLrc">打开文件</b> 按钮选择。</p>
+      <p style="margin-top:18px" data-page-node-id="3HFjQxTe4wNj7ykdEERy5j">
+        <button class="btn primary" id="btnOpen2" style="padding:9px 22px;font-size:14px" data-page-node-id="acvBiXLEyE1bGaeEwXU0N6">选择 PDF / 图片</button>
+      </p>
+      <p style="margin-top:16px;color:var(--ink-faint);font-size:12px" data-page-node-id="GdYSuBfBhD264lmRSAapso">
+        全部在本地浏览器中处理，文件不会上传到任何服务器。
+      </p>
+    </div>
+  </div>
+
+  <!-- 阅读底色选择 -->
+  <div id="themePanel" data-page-node-id="M8AqHQgScTQV8Tx5FbbTPd">
+    <div class="tp-title" data-page-node-id="6LZwepfXkt3KEks7QoTPBZ">阅读底色</div>
+    <div class="tp-list" id="themeList" data-page-node-id="6nr9RSuISUpEbUEnDwZYEr"></div>
+  </div>
+
+  <!-- 最近打开历史 -->
+  <div id="histPanel" data-page-node-id="uFTrt79eQ22Y9bfOphxW9w">
+    <div class="hp-head" data-page-node-id="NJlHJ8BY0TocHJiOei7V0a">
+      <span class="hp-title" data-page-node-id="MfR5LOOUMHPdgTvTPmgtVA">最近打开</span>
+      <button class="hp-clear" id="histClear" title="清空全部记录" data-page-node-id="8sa9v7RoiR1Tq7EnCo2K1S">清空</button>
+    </div>
+    <div class="hp-list" id="histList" data-page-node-id="NnPG7zwPPcH196FPNEYbGJ"></div>
+  </div>
+
+  <!-- 拖放覆盖层 -->
+  <div id="dropzone" data-page-node-id="65OCv3Xt1FnIcsB0xHe8RQ">
+    <div class="dz-inner" data-page-node-id="KBifCXxRV6rBxRxWw0Smrb">
+      <div class="dz-icon" data-page-node-id="yk7UshjnVjPDegDd0yyhFP">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"
+             stroke-linecap="round" stroke-linejoin="round" data-page-node-id="3YABHenprVl0GmQpwj5I5E">
+          <path d="M12 16V4m0 0L7 9m5-5l5 5" data-page-node-id="tz3KaCQVlRmNnVaQ6o5czG"/><path d="M4 17v2a2 2 0 002 2h12a2 2 0 002-2v-2" data-page-node-id="hwuyRDB9TDBgIfuLHjQylR"/>
+        </svg>
+      </div>
+      <div class="dz-text" data-page-node-id="RcXxogqB1DO18drIXE5sHy">松手即开始阅读</div>
+      <div class="dz-sub" data-page-node-id="t0UfHs5zyx2xJFPqxCdnEe">支持 PDF 与 JPG / PNG / TIFF 等图片</div>
+    </div>
+  </div>
+</main>
+
+<footer data-page-node-id="bg9YGBMOZ7ZTzKNAXmDwiT">
+  <div class="row" data-page-node-id="b9jWQwuux5K47Fs1DMLywB">
+    <span id="pageLabel" data-page-node-id="FFdaYcmYrsu9aErlbPUxaJ"><b data-page-node-id="1FNe0LxZk7KRjVpkMZjkbW">0</b> / 0</span>
+    <input type="range" id="slider" min="0" max="0" value="0" step="1" aria-label="进度" data-page-node-id="krLVbBff5BOqJBcy55WRhc">
+    <span class="hint" id="dirHint" data-page-node-id="sCmAC6tjtbBK8CfoPvMI6h">右开本 · 第1页在右</span>
+  </div>
+  <div class="row" data-page-node-id="lk44ew7FXDqJgGnMmLafLu">
+    <span class="hint" id="zoomLabel" data-page-node-id="YbFHn6P7UghIp78BP5COtF">100%</span>
+    <span class="hint" id="zoomHint" data-page-node-id="spMicaFIQi5Fay1S3J4oyc"></span>
+    <span class="hint" data-page-node-id="62Zvnbu9HRnAAvUgNJh42D">← → 翻页</span>
+    <span class="hint" data-page-node-id="o72zivq8xCGGKvdDHuz7Py">空格 下一页</span>
+    <span class="hint" data-page-node-id="EvU5WIVyCUG9ugAYdcZW5E">+ − 缩放</span>
+    <span class="hint" data-page-node-id="NgpdP9vds1fB4OJi7ge923">F 全屏</span>
+    <span class="hint" data-page-node-id="WYetuz9NC1qUrsSXgzOzjR">G 跳转</span>
+    <span class="hint" data-page-node-id="YiSbFtuA7tSw3b6jBMcdSI">T 换底色</span>
+    <span class="hint" data-page-node-id="EBVrZhDiFk53YMnSK1B1EU">H 最近</span>
+    <span class="hint" data-page-node-id="HRKgzCDFsdjPhGhJQ6Ho5m">拖动 平移/翻页</span>
+    <span class="hint" data-page-node-id="2pEhkyER5FlYxk2QRCaGJS">O 打开文件</span>
+  </div>
+</footer>
+
+<div id="thumbs" data-page-node-id="68uSjMfDMao7HyVWJeYXgB"><div id="thumbStrip" data-page-node-id="LI5OTbOIJ1Qrd2IgutnCYB"></div></div>
+
+<div id="overlay" data-page-node-id="rBkTaqPWzWPtexjijdB9oN">
+  <div class="dialog" data-page-node-id="cNTCgzwlQx70BeWJKI8iKi">
+    <h3 data-page-node-id="SciGCC5J2OciOw5LP1h129">跳转到指定页</h3>
+    <label for="goInput" data-page-node-id="GCXGUcosDAINrSWUjloq97">页码（1 – <span id="goMax" data-page-node-id="JvKYzRVjCU683cj7zYe1nu">0</span>）</label>
+    <input type="number" id="goInput" min="1" value="1" data-page-node-id="wPEtC30E8pQKCjdEHjQjhE">
+    <div class="acts" data-page-node-id="9BS2hKYBbvxmyaJ5Ap5DIV">
+      <button class="btn" id="goCancel" data-page-node-id="aKOmtCROJgnkOG1fzesGPo">取消</button>
+      <button class="btn" id="goOk" style="background:var(--accent);border-color:var(--accent);color:#fff" data-page-node-id="rwP5pMYWs5ZKLfqlZHrEBK">前往</button>
+    </div>
+  </div>
+</div>
+
+<!-- PDF 解析库：预热**本地副本**（随程序一起分发，断网也能用）。
+     早先这里写死的是 cdnjs 的地址，一旦连不上，导入 PDF 就"什么都没有"。
+     万一 vendor 目录缺失，ensurePdfjs() 会自动退回 CDN；
+     两条路都不通时才弹出说明原因的提示。 -->
+<!-- 演示书的清单副本：file:// 双击直开时 fetch() 会被浏览器拦下，
+     这个用 <script> 引入的副本让演示库在直开时也能正常显示 -->
+<script src="data/manifest.embed.js"></script>
+<script src="vendor/pdfjs/pdf.min.js"></script>
+<script>
+"use strict";
+
+/* =======================================================================
+   右翻书古籍阅读器
+
+   页序约定：state.pages 永远按「第 1 页在前」的自然顺序存放。
+   左右摆位由 laneSlots() 依据装帧方向计算，不改变数组本身顺序。
+   详见下方「方向模型」注释。
+   ======================================================================= */
+
+const DATA_URL = "data/manifest.json";
+
+const state = {
+  pages: [],          // 页面数组，下标 0 就是第 1 页
+  dir: "right-to-left",   // 装帧方向：right-to-left(古籍右开) / left-to-right(现代左开)
+  idx: 0,             // 当前页码（0 基，0 = 第 1 页）—— 驱动所有 UI
+  fitHeight: 0,       // 适应窗口时的页面高度(px)
+  zoom: 1,            // 相对适应高度的缩放倍率
+  title: "右翻书古籍阅读器",
+  ready: false,
+  userPickedDir: false,  // 用户是否手动切过装帧方向
+  // 阅读底色主题
+  theme: "paper",
+  // 聚焦模式：开启后当前读的范围清晰、两侧虚化
+  focus: false,
+  // 聚焦范围："1" 只聚焦当前一页；"2" 聚焦当前跨（对开的两页）
+  focusScope: "1",
+  // 视图模式：scroll(连续滚动轨道) / book(翻书：对开 + 翻页动画)
+  view: "scroll",
+  // 当前这本书的历史记录 id（用于「最近打开」高亮与书签回写）
+  bookId: "",
+};
+
+/* ---------- DOM ---------- */
+const $ = (id) => document.getElementById(id);
+const stage = $("stage"), track = $("track");
+const btnPrev = $("btnPrev"), btnNext = $("btnNext");
+const slider = $("slider"), pageLabel = $("pageLabel"), zoomLabel = $("zoomLabel");
+const dirRTL = $("dirRTL"), dirLTR = $("dirLTR"), dirHint = $("dirHint");
+const thumbs = $("thumbs"), thumbStrip = $("thumbStrip");
+const overlay = $("overlay"), goInput = $("goInput");
+
+/** 用户点了「本机文件」类的历史记录后，等待他重新选择的那本书 */
+let pendingResume = null;
+
+/* ---------- 工具 ---------- */
+function flash(msg){
+  const el = $("flash");
+  el.textContent = msg;
+  el.classList.add("show");
+  clearTimeout(flash._t);
+  flash._t = setTimeout(() => el.classList.remove("show"), 1000);
+}
+
+function loadImage(src){
+  return new Promise((res) => {
+    const im = new Image();
+    im.onload = () => res({ ok:true, w:im.naturalWidth, h:im.naturalHeight });
+    im.onerror = () => res({ ok:false, w:0, h:0 });
+    im.src = src;
+  });
+}
+
+/* ---------- 尺寸计算 ---------- */
+function computeFitHeight(){
+  // 页面按高度铺满阅读区，宽度自然溢出 —— 单页阅读时观感最接近实体书
+  const h = stage.clientHeight - 44;
+  state.fitHeight = Math.max(200, h);
+}
+
+/** 是否处于"放大后可滚动"模式 */
+function isZoomed(){
+  return state.zoom > 1.01;
+}
+
+/* ===================================================================
+   手抓拖动
+
+   一个手势，两种含义，按当前模式分流：
+
+     未缩放 —— 拖动当"翻页手势"用：
+       按下并横向拖过阈值就翻一页，跟触屏滑动的手感一致。
+       这里松开时才判定，中途只做跟手的视觉反馈。
+
+     已缩放 —— 拖动当"平移画布"用：
+       内容比窗口大，按住直接拖比去够滚动条方便得多。
+       滚动方向要跟着装帧方向走：
+         右开本：手指向右拖 ⇒ 看更靠后的页（手指拖着纸往右走，后面的页从左边进来）
+         左开本：手指向左拖 ⇒ 看更靠后的页
+       换成 scrollLeft 的话，两种方向都是「手指往哪拖，scrollLeft 就往反方向减」，
+       所以统一写成 scrollLeft -= dx 即可，无需按方向分支。
+
+   用 Pointer Events 而不是分别监听 mouse/touch：
+   一套代码同时覆盖鼠标、触屏、触控笔，且能用 setPointerCapture
+   保证鼠标拖出窗口再松开也能正确收尾（否则会卡在"抓取中"状态）。
+   =================================================================== */
+
+const drag = {
+  active: false,
+  id: null,          // pointerId
+  startX: 0, startY: 0,
+  lastX: 0,
+  startScroll: 0,
+  moved: false,      // 是否已超过判定阈值
+  panned: false,     // 本次是否真的平移过
+  axis: "",          // "x" | "y" | ""  首次移动时锁定主方向
+  justDragged: false,// 上一次手势是拖动；用于忽略紧随其后的 click
+};
+
+/** 拖动判定阈值：低于它视为点击，不触发拖动逻辑 */
+const DRAG_MIN = 6;
+/** 未缩放时，拖多远算翻一页 */
+const SWIPE_MIN = 42;
+
+function dragThreshold(){
+  return isZoomed() ? DRAG_MIN : SWIPE_MIN;
+}
+
+function beginDrag(e){
+  if (!state.ready) return;
+  if (e.button !== undefined && e.button !== 0) return;      // 只响应左键
+  if (e.target.closest(".nav, header, footer, #thumbs, #themePanel, #histPanel, #overlay")) return;
+
+  // 立刻中断上一次松手触发的平滑吸附动画。
+  // 否则新拖动会和还在进行的 scrollTo({behavior:"smooth"}) 抢滚动位置：
+  // 动画会把 scrollLeft 往回拉，用户看到的就是"拖了半天几乎没动"。
+  stage.scrollTo({ left: stage.scrollLeft, behavior: "auto" });
+
+  drag.active = true;
+  drag.id = e.pointerId;
+  drag.startX = drag.lastX = e.clientX;
+  drag.startY = e.clientY;
+  drag.startScroll = stage.scrollLeft;
+  drag.moved = false;
+  drag.panned = false;
+  drag.axis = "";
+
+  // 捕获指针：鼠标拖出窗口再松开也能收到 pointerup
+  try { stage.setPointerCapture(e.pointerId); } catch(err){}
+}
+
+function moveDrag(e){
+  if (!drag.active || e.pointerId !== drag.id) return;
+
+  const dx = e.clientX - drag.startX;
+  const dy = e.clientY - drag.startY;
+
+  // 首次移动锁定主轴：横向手势才当拖动，纵向留给原生滚动
+  if (!drag.axis){
+    if (Math.abs(dx) < DRAG_MIN && Math.abs(dy) < DRAG_MIN) return;
+    drag.axis = Math.abs(dx) >= Math.abs(dy) ? "x" : "y";
+    if (drag.axis === "y" && !isZoomed()){
+      // 未缩放时纵向手势没有意义，直接放弃这次拖动
+      endDrag(e, true);
+      return;
+    }
+  }
+  if (drag.axis !== "x") return;
+
+  drag.moved = true;
+
+  if (isZoomed()){
+    // 平移画布：手指往右拖，内容跟着往右走
+    const nextScroll = drag.startScroll - dx;
+    const max = maxScrollLeft();
+    const clamped = Math.max(0, Math.min(max, nextScroll));
+    stage.scrollLeft = clamped;
+    drag.panned = true;
+    stage.classList.add("grabbing", "dragging");
+  } else {
+    // 未缩放：给一点跟手的位移反馈，松手才决定是否翻页
+    const pull = Math.max(-90, Math.min(90, dx)) * 0.42;
+    track.classList.add("instant");
+    track.style.transform = "translate3d(" + (targetX() + pull) + "px,0,0)";
+    stage.classList.add("grabbing", "dragging");
+  }
+}
+
+function endDrag(e, cancel){
+  if (!drag.active) return;
+  if (e && e.pointerId !== undefined && e.pointerId !== drag.id) return;
+
+  const wasMoved = drag.moved;
+  const wasPanned = drag.panned;
+  const dx = (e ? e.clientX : drag.lastX) - drag.startX;
+  const dy = (e ? e.clientY : drag.startY) - drag.startY;
+
+  drag.active = false;
+  drag.id = null;
+  drag.moved = false;
+  drag.panned = false;
+  drag.axis = "";
+  // 记下"这次手势是拖动"，供紧随其后的 click 事件判断并忽略。
+  // 不能只看 drag.moved —— 上面刚把它清掉了，而 click 是之后才派发的。
+  if (wasMoved) drag.justDragged = true;
+
+  try { stage.releasePointerCapture(e.pointerId); } catch(err){}
+  stage.classList.remove("grabbing", "dragging");
+
+  if (cancel) return;
+
+  if (isZoomed()){
+    // 平移结束：页码跟着滚动位置更新，并把当前页吸附到视野内
+    if (wasPanned){
+      const p = pageAtScroll();
+      if (p !== state.idx){ state.idx = p; updateChrome(); markThumb(); }
+      snapToCurrentPage();
+    }
+    return;
+  }
+
+  // 未缩放：松手后归位，再决定是否翻页
+  track.classList.remove("instant");
+  alignToCurrent(!wasMoved ? false : true);
+
+  if (!wasMoved) return;
+  if (Math.abs(dx) < SWIPE_MIN || Math.abs(dx) < Math.abs(dy) * 1.2) return;
+
+  // 统一语义：往左拖 = 下一页，往右拖 = 上一页（与触屏滑动、按钮一致）
+  if (dx < 0) next(); else prev();
+}
+
+/**
+ * 一页「露出得够多」的判定阈值。
+ *
+ * 注意分母必须是**页面自己的宽度**，不是视野宽度。
+ * 用视野宽度会出错：缩放后一页往往只占视野的 40%~50%
+ * （实测 668px 的页放在 1416px 的视野里 = 47%），
+ * 这时"露出过半视野"永远不成立，判定就会全盘失效。
+ */
+function mostlyVisibleRatio(){ return 0.6; }
+
+/** 这一页在视野里露出的宽度占自身宽度的比例 */
+function visibleRatioOf(el){
+  const sr = stage.getBoundingClientRect();
+  const b = el.getBoundingClientRect();
+  const w = b.width || 1;
+  const visible = Math.min(b.right, sr.right) - Math.max(b.left, sr.left);
+  return Math.max(0, Math.min(1, visible / w));
+}
+
+/**
+ * 平移结束后决定要不要吸附。
+ *
+ * 拖动是「自由浏览」，不能每松一次手就把页面拽回居中 ——
+ * 那样用户刚拖过去看右边一截，一松手就被拉回来，手感非常别扭。
+ *
+ * 只在一种情况下吸附：**视野里没有任何一页露出超过自身宽度的 60%**，
+ * 说明停在了两页之间那种"两页都只看得到一小半"的尴尬位置。
+ * 其余情况（包括贴左端、贴右端）一律保持用户拖到的位置。
+ */
+function snapToCurrentPage(){
+  if (!isZoomed()) return;
+
+  const thr = mostlyVisibleRatio();
+  let anyMostlyVisible = false;
+  track.querySelectorAll(".page").forEach((el) => {
+    if (visibleRatioOf(el) >= thr) anyMostlyVisible = true;
+  });
+
+  if (anyMostlyVisible) return;   // 用户看得好好的，别动
+
+  const target = scrollLeftForPage(state.idx);
+  if (Math.abs(target - stage.scrollLeft) < 4) return;
+  stage.scrollTo({ left: target, behavior: "smooth" });
+}
+
+/** 最大可滚动距离 */
+function maxScrollLeft(){
+  return Math.max(0, stage.scrollWidth - stage.clientWidth);
+}
+
+/**
+ * 把当前语义页码换算成它应该占据的 scrollLeft（仅缩放模式）。
+ *
+ * 右开本的滚动条从右向左：语义页码越大，内容越靠左，scrollLeft 越小。
+ * 所以这里不做额外的方向反转 —— laneSlots() 已经把第 1 页放在最右格，
+ * 内容天然就是从右向左推进的，scrollLeft 只要老实反映几何位置即可。
+ *
+ * 两端要做边界对齐，而不是简单地把页面居中：
+ *   - 第 1 页（右开本的起点）应当贴着右端，即 scrollLeft = max
+ *   - 末页应当贴着左端，即 scrollLeft = 0
+ * 否则「起点」会是 max - 半个视野，与 resetScrollStart() 设定的起点对不上，
+ * 用户一松手就会被吸附走一段距离，看着像是"拖了却没动"。
+ */
+function scrollLeftForPage(srcIdx){
+  const total = state.pages.length;
+  const el = pageEl(srcIdx);
+  if (!el || !total) return 0;
+
+  const max = maxScrollLeft();
+
+  // 第 1 页永远是"阅读起点"，只是贴的边随装帧方向不同：
+  //   右开本 —— 第 1 页在最右格，贴右端（scrollLeft = max）
+  //   左开本 —— 第 1 页在最左格，贴左端（scrollLeft = 0）
+  // 末页不用特别处理：它天然落在另一端，下面的居中公式夹一下就是对的。
+  if (srcIdx === 0) return state.dir === "right-to-left" ? max : 0;
+
+  // 让这一页水平居中；再夹到合法范围
+  const center = el.offsetLeft + el.offsetWidth / 2;
+  const target = center - stage.clientWidth / 2;
+  return Math.max(0, Math.min(max, target));
+}
+
+/** 指定语义页码对应的 DOM 元素 */
+function pageEl(srcIdx){
+  const total = state.pages.length;
+  if (!total) return null;
+  const slot = slotOfPage(state.dir, total)[srcIdx];
+  return track.children[slot] || null;
+}
+
+/**
+ * 进入缩放模式时把滚动条移到「起点」。
+ * 右开本起点在最右端（scrollLeft = max），左开本起点在最左端（0）。
+ * 这是让用户一眼看出滚动方向的唯一办法。
+ */
+function resetScrollStart(){
+  stage.scrollLeft = state.dir === "right-to-left" ? maxScrollLeft() : 0;
+}
+
+/** 把当前页滚到视野内（仅缩放模式） */
+function scrollCurrentIntoView(smooth){
+  if (!isZoomed()) return;
+  const target = scrollLeftForPage(state.idx);
+  stage.scrollTo({ left: target, behavior: smooth ? "smooth" : "auto" });
+}
+
+/**
+ * 当前滚动位置对应的语义页码（仅缩放模式）。
+ *
+ * 判定依据不能只看"谁露出的面积最大"。缩放后视野里往往同时有 2~3 页，
+ * 面积最大者常常不是读者心里的那一页 —— 例如停在最右端（右开本的起点）时，
+ * 第 1 页只露出后半部分，而第 2 页完整可见，按面积算会把当前页判成第 2 页，
+ * 于是后续吸附又会把视野从"贴右端"挪到"第 2 页居中"，看起来就是拖了没反应。
+ *
+ * 改用「阅读顺序上的领先原则」：
+ *   右开本读的时候视线从左往右移，所以视野里最靠左的那页是已经读完的、
+ *   最靠右的边缘才是"接下来要读"的位置。
+ *
+ * 具体做法：取「在视野里露出的宽度超过可见宽度一半」的页面中最靠后的那一页
+ * （右开本取 srcIdx 最大者，左开本取最小者）。露出过半才算数，
+ * 避免刚蹭到一角的页被误判成当前页。
+ */
+function pageAtScroll(){
+  if (!isZoomed()) return state.idx;
+  const rtl = state.dir === "right-to-left";
+  const thr = mostlyVisibleRatio();
+
+  // 贴着"阅读起点"那一端时，当前页就是第 1 页。
+  // 窗口够宽时一屏常常同时容下第 1、2 页，若一律取"语义页码更靠后的那一页"，
+  // 刚放大到滚动模式、或刚从别处回到开头，页码会显示成第 2 页 ——
+  // 与"这本书刚翻开、正看着第一页"的事实对不上。
+  const startEdge = rtl ? maxScrollLeft() : 0;
+  if (Math.abs(stage.scrollLeft - startEdge) <= 4) return 0;
+
+  let best = null;
+  track.querySelectorAll(".page").forEach((el) => {
+    if (visibleRatioOf(el) < thr) return;   // 露出太少，不算"在看这一页"
+    const idx = Number(el.dataset.src);
+    if (best === null) { best = idx; return; }
+    // 右开本：取语义页码更大者（更靠后）；左开本反之
+    if (rtl ? idx > best : idx < best) best = idx;
+  });
+
+  // 一页都没露出足够多（例如正停在两页之间）：退回面积最大者，保证总有结果
+  if (best === null){
+    const sr = stage.getBoundingClientRect();
+    let bestArea = -1;
+    track.querySelectorAll(".page").forEach((el) => {
+      const b = el.getBoundingClientRect();
+      const w = Math.min(b.right, sr.right) - Math.max(b.left, sr.left);
+      const h = Math.min(b.bottom, sr.bottom) - Math.max(b.top, sr.top);
+      const area = Math.max(0, w) * Math.max(0, h);
+      if (area > bestArea){ bestArea = area; best = Number(el.dataset.src); }
+    });
+  }
+  return best === null ? state.idx : best;
+}
+
+function applyScale(){
+  const ph = Math.round(state.fitHeight * state.zoom);
+  track.querySelectorAll(".page .sheet").forEach((sheet) => {
+    sheet.style.height = ph + "px";
+    // 高度变了，按预留的宽高比重算宽度，否则轨道宽度会不对
+    const ar = Number(sheet.dataset.ar || 0);
+    if (ar > 0) sheet.style.width = Math.round(ph * ar) + "px";
+  });
+  zoomLabel.textContent = Math.round(state.zoom * 100) + "%";
+
+  const wasZoomed = stage.classList.contains("zoomed");
+  const zoomed = isZoomed();
+  stage.classList.toggle("zoomed", zoomed);
+
+  // 缩放是我们主动改的，位置也归我们管 —— 解开"用户已接管"，
+  // 这样缩放引起的高度/宽度变化若是引起轨道尺寸变动，会自动贴回当前页。
+  userOwnsScroll = false;
+
+  // 进入滚动模式时提示该往哪个方向拖，避免用户以为滚动条坏了
+  const zh = $("zoomHint");
+  if (zoomed){
+    zh.textContent = state.dir === "right-to-left" ? "滚动条从右向左拖" : "滚动条从左向右拖";
+  } else {
+    zh.textContent = "";
+  }
+
+  if (!state.ready) return;
+
+  if (zoomed){
+    if (!wasZoomed){
+      // 刚从「居中模式」进入滚动模式。
+      //
+      // 两个目标要同时满足，且顺序不能反：
+      //   1. 用户仍停在原来那一页（不能因为放大就跳回第 1 页）
+      //   2. 若本来就在第 1 页，则滚动条要停在「方向起点」那一端，
+      //      这样用户一眼能看出该往哪边拖
+      //
+      // 第 1 页恰好位于起点那一端（右开本在最右、左开本在最左），
+      // 所以「停在第 1 页」和「停在起点」本来就重合，不冲突。
+      // 但若当前不在第 1 页，就只做第 1 件事，别把人家拉回开头。
+      const atFirst = state.idx === 0;
+      requestAnimationFrame(() => {
+        if (atFirst) resetScrollStart();
+        else scrollCurrentIntoView(false);
+      });
+    } else {
+      // 已经在滚动模式里继续放大/缩小：保持当前页在视野内
+      scrollCurrentIntoView(false);
+    }
+  } else {
+    stage.scrollLeft = 0;
+    alignToCurrent(false);
+  }
+}
+
+/* ===================================================================
+   方向模型（重新梳理，务必先读懂再改）
+
+   全书有两种装帧方向，区别只在「第 1 页摆在最左还是最右」：
+
+     右开本（古籍，默认）  第1页 ... 第N页   ← 从右往左读
+                          ^最右端是第1页
+
+     左开本（现代）        第1页 ... 第N页   → 从左往右读
+                          ^最左端是第1页
+
+   实现上分两层，不要混：
+
+   ┌ srcIdx ────────────────────────────────────────────────┐
+   │ 页面在「第几页」的语义序号，从 0 开始。                  │
+   │ 0 = 第 1 页，n-1 = 末页。这是唯一驱动 UI 的真相。        │
+   └────────────────────────────────────────────────────────┘
+                          ↓ 由 laneSlots() 映射
+   ┌ domSlot ───────────────────────────────────────────────┐
+   │ 页面在 DOM 轨道里从左到右占用的格子号，只影响摆放位置。   │
+   │ 右开本：第1页占最右的格子；左开本：占最左的格子。         │
+   └────────────────────────────────────────────────────────┘
+
+   关键约定：
+   - 下一页 = srcIdx + 1（语义上的"往后读"），两种方向都一样
+   - 页面在屏幕上的滑动方向由装帧方向决定：
+       右开本：内容整体向左滑（读者视线从右往左移）
+       左开本：内容整体向右滑
+   - 左侧按钮永远是「上一页」，右侧按钮永远是「下一页」，与装帧方向无关。
+     这符合所有人的直觉，不要为了"古籍感"把按钮也反过来。
+   =================================================================== */
+
+/**
+ * 生成 domSlot -> srcIdx 的映射数组。
+ * 数组下标是 DOM 格子号（从左到右），值是该格子放第几页（srcIdx）。
+ *
+ * 右开本：末页在最左一格，第 1 页在最右一格 -> [n-1, n-2, ..., 0]
+ * 左开本：第 1 页在最左一格 -> [0, 1, ..., n-1]
+ */
+function laneSlots(dir, n){
+  return dir === "right-to-left"
+    ? Array.from({length:n}, (_, slot) => n - 1 - slot)
+    : Array.from({length:n}, (_, slot) => slot);
+}
+
+/** srcIdx -> domSlot 的反查表 */
+function slotOfPage(dir, n){
+  const lane = laneSlots(dir, n);
+  const map = new Array(n);
+  lane.forEach((srcIdx, slot) => { map[srcIdx] = slot; });
+  return map;
+}
+
+/* ===================================================================
+   阅读底色主题
+   五种护眼配色。选择结果记在 localStorage，下次打开自动沿用。
+   =================================================================== */
+
+const THEMES = [
+  { id:"paper",      name:"宣纸",   dot:"#ede8dd", hint:"暖白偏黄，最接近古籍用纸" },
+  { id:"green",      name:"豆沙绿", dot:"#c7d9c2", hint:"经典护眼色，降低蓝光刺激" },
+  { id:"amber",      name:"米黄",   dot:"#f2e6c9", hint:"柔和暖黄，适合长时间阅读" },
+  { id:"slate",      name:"青灰",   dot:"#dde3e4", hint:"冷调低饱和，光线偏暖时舒服" },
+  { id:"sepia-dark", name:"深褐",   dot:"#2b2723", hint:"暗色主题，夜间不刺眼" },
+];
+
+const THEME_KEY = "gushi-reader-theme";
+
+/**
+ * 切换阅读底色。
+ *
+ * 注意：切换的瞬间要先把 body 上的过渡关掉，改完再恢复。
+ * body 上有 background-color 的过渡，若带着过渡改 CSS 变量，
+ * 浏览器会把计算出的背景色在过渡期间"钉"在起始色上，
+ * 于是变量已经变了、画面却还是旧颜色（无头/后台标签页里尤其明显，
+ * 甚至可能一直停在旧色上不推进）。关掉过渡后再切换，颜色立即生效，
+ * 之后再恢复过渡，不影响其它属性变更的平滑度。
+ */
+function applyTheme(id){
+  const theme = THEMES.find((t) => t.id === id) || THEMES[0];
+  state.theme = theme.id;
+
+  const prev = document.body.style.transition;
+  document.body.style.transition = "none";
+  document.body.setAttribute("data-theme", theme.id);
+  // 读一次布局，确保上面这次变更被立即结算，再恢复过渡
+  void document.body.offsetHeight;
+  document.body.style.transition = prev;
+
+  // 同步选中态
+  $("themeList").querySelectorAll(".tp-item").forEach((el) => {
+    el.classList.toggle("cur", el.dataset.theme === theme.id);
+  });
+
+  try { localStorage.setItem(THEME_KEY, theme.id); } catch(e){}
+}
+
+function buildThemeList(){
+  const list = $("themeList");
+  list.innerHTML = "";
+  THEMES.forEach((t) => {
+    const d = document.createElement("div");
+    d.className = "tp-item";
+    d.dataset.theme = t.id;
+    d.title = t.hint;
+    const dot = document.createElement("span");
+    dot.className = "tp-dot";
+    dot.style.background = t.dot;
+    const nm = document.createElement("span");
+    nm.className = "tp-name";
+    nm.textContent = t.name;
+    const ht = document.createElement("span");
+    ht.className = "tp-hint";
+    ht.textContent = t.hint;
+    d.appendChild(dot);
+    d.appendChild(nm);
+    d.appendChild(ht);
+    d.addEventListener("click", () => {
+      applyTheme(t.id);
+      closeThemePanel();
+      flash("底色：" + t.name);
+    });
+    list.appendChild(d);
+  });
+}
+
+function openThemePanel(){
+  $("themePanel").classList.add("open");
+}
+function closeThemePanel(){
+  $("themePanel").classList.remove("open");
+}
+function toggleThemePanel(){
+  $("themePanel").classList.toggle("open");
+}
+
+/** 按顺序切到下一个主题（快捷键 T） */
+function cycleTheme(){
+  const i = THEMES.findIndex((t) => t.id === state.theme);
+  const next = THEMES[(i + 1) % THEMES.length];
+  applyTheme(next.id);
+  flash("底色：" + next.name);
+}
+
+/* ===================================================================
+   聚焦（可选，范围可选：一页 / 两页）
+
+   开启后：聚焦范围内的页保持清晰，两侧页面轻微虚化 + 变淡。
+   视觉焦点自然落在正在读的范围上，翻页时清晰页跟着走。
+
+   范围两种：
+     - "1" 一页：只有当前页（state.idx）清晰；
+     - "2" 两页：当前跨（crosses）里的页都清晰 —— 对开扫描是整张，
+       配对单页是左右两张，与翻书模式一屏摊开的范围一致，
+       看跨页表格 / 批注对照时不会有一条边被虚化。
+
+   实现要点：
+     - CSS 挂在 body[data-focus="1"] 上，页元素只负责标记 .focus-cur；
+     - 页码标签 .pnum 在 .sheet 外面，两侧页的页码保持可读；
+     - 每次翻页后要重新标记，否则虚化会停留在上一页上。
+       所有翻页路径（goTo / 缩放滚动同步 / 滑块）都会汇到
+       updateChrome()，在那里重新标记即可全覆盖。
+   =================================================================== */
+
+const FOCUS_KEY = "gushi-reader-focus";
+const FOCUS_SCOPE_KEY = "gushi-reader-focus-scope";
+
+/** 当前聚焦范围内应保持清晰的页（语义页码字符串集合） */
+function focusPageSet(){
+  if (!state.pages.length) return [];
+  if (state.focusScope === "2"){
+    const cs = crosses();
+    return cs[crossIndexAt(state.idx)].pages.map(String);
+  }
+  return [String(state.idx)];
+}
+
+function markFocusPage(){
+  const set = new Set(focusPageSet());
+  track.querySelectorAll(".page").forEach((el) => {
+    el.classList.toggle("focus-cur", state.focus && set.has(el.dataset.src));
+  });
+}
+
+/** 两个聚焦按钮的高亮态：当前生效范围亮、另一个灭 */
+function applyFocusButtons(){
+  $("btnFocus").setAttribute("aria-pressed",
+    String(state.focus && state.focusScope === "1"));
+  $("btnFocus2").setAttribute("aria-pressed",
+    String(state.focus && state.focusScope === "2"));
+}
+
+/** 聚焦范围变化后统一收尾：改 body 属性、按钮、重标记 */
+function applyFocusState(){
+  document.body.setAttribute("data-focus", state.focus ? "1" : "0");
+  applyFocusButtons();
+  markFocusPage();
+}
+
+/**
+ * 开关聚焦模式（保持当前范围不变）。
+ * 与底色一样记在 localStorage，下次打开自动沿用。
+ */
+function setFocusMode(on){
+  state.focus = !!on;
+  applyFocusState();
+  try { localStorage.setItem(FOCUS_KEY, state.focus ? "1" : "0"); } catch(e){}
+}
+
+/** 设定聚焦范围；若聚焦未开则顺手打开 */
+function setFocusScope(scope){
+  const s = scope === "2" ? "2" : "1";
+  const changed = state.focusScope !== s;
+  state.focusScope = s;
+  if (!state.focus) setFocusMode(true);
+  else applyFocusState();
+  try { localStorage.setItem(FOCUS_SCOPE_KEY, s); } catch(e){}
+  return changed;
+}
+
+function focusFlash(){
+  if (!state.focus) flash("聚焦模式：关");
+  else flash(state.focusScope === "2" ? "聚焦模式：两页" : "聚焦模式：一页");
+}
+
+/** 点「聚焦1页」：已在该档位则关闭，否则切到一页聚焦 */
+function clickFocus1(){
+  if (state.focus && state.focusScope === "1") setFocusMode(false);
+  else setFocusScope("1");
+  focusFlash();
+}
+
+/** 点「聚焦2页」：已在该档位则关闭，否则切到两页聚焦 */
+function clickFocus2(){
+  if (state.focus && state.focusScope === "2") setFocusMode(false);
+  else setFocusScope("2");
+  focusFlash();
+}
+
+/** X 键循环：关 → 一页 → 两页 → 关 */
+function cycleFocusMode(){
+  if (!state.focus) setFocusScope("1");
+  else if (state.focusScope === "1") setFocusScope("2");
+  else setFocusMode(false);
+  focusFlash();
+}
+
+/* ===================================================================
+   最近打开历史
+
+   一个绕不开的现实：浏览器的沙箱机制下，网页无法凭一份记录重新读回
+   本机文件（File 对象只在用户当次选择时有效）。所以这里分两种情况：
+
+     1) 磁盘模式（data/manifest.json）—— 这类书籍的页面是相对路径，
+        记录里只需存 manifest 地址，下次点一下就能重新载入，完全无缝。
+
+     2) 拖进来的本机文件 —— 存不了文件本身（几十 MB 也塞不进
+        localStorage）。这类记录只保留书名、页数、上次读到的页码，
+        点击时提示用户重新选择该文件；选回来自动跳到上次的位置。
+
+   记录按「最近打开」倒序，最多保留 MAX_HISTORY 条。
+   =================================================================== */
+
+const HIST_KEY = "gushi-reader-history";
+const MAX_HISTORY = 12;
+
+/** 读记录（容错：内容损坏时当作空列表，不让它把整个阅读器带崩） */
+function readHistory(){
+  try{
+    const raw = localStorage.getItem(HIST_KEY);
+    if (!raw) return [];
+    const arr = JSON.parse(raw);
+    return Array.isArray(arr) ? arr.filter((it) => it && it.id) : [];
+  }catch(e){ return []; }
+}
+
+function writeHistory(list){
+  try { localStorage.setItem(HIST_KEY, JSON.stringify(list)); }catch(e){}
+}
+
+/**
+ * 写入 / 更新一条记录。
+ *
+ * kind: "local"  磁盘模式，可凭 manifest 直接重开
+ *       "file"   本机文件，只能记住书签，重开需用户重新选文件
+ */
+function rememberBook(entry){
+  const list = readHistory();
+  const i = list.findIndex((it) => it.id === entry.id);
+  const prev = i >= 0 ? list[i] : null;
+  const item = {
+    id: entry.id,
+    name: entry.name || "未命名",
+    kind: entry.kind || "local",
+    // 磁盘模式的书靠这个地址重开；以前这里的字段白名单把 src 丢了，
+    // 导致「最近打开」里的磁盘书点开被当成本机文件、误弹"请重新选择文件"。
+    src: entry.src || (prev && prev.src) || "",
+    total: entry.total || (prev && prev.total) || 0,
+    page: entry.page || 1,
+    dir: entry.dir || (prev && prev.dir) || "right-to-left",
+    theme: entry.theme || (prev && prev.theme) || "paper",
+    at: Date.now(),
+  };
+  if (i >= 0) list.splice(i, 1);
+  list.unshift(item);
+  writeHistory(list.slice(0, MAX_HISTORY));
+  pruneOrphanCaches();   // 被挤出列表的旧书，句柄和文件缓存跟着清
+  buildHistoryList();
+}
+
+/** 更新「当前这本书读到哪里」——切页时调用 */
+function touchCurrentBook(){
+  if (!state.ready || !state.bookId) return;
+  const list = readHistory();
+  const it = list.find((x) => x.id === state.bookId);
+  if (!it) return;
+  it.page = state.idx + 1;
+  it.total = state.pages.length;
+  it.dir = state.dir;
+  it.theme = state.theme;
+  it.at = Date.now();
+  writeHistory(list);
+}
+
+function forgetBook(id){
+  writeHistory(readHistory().filter((it) => it.id !== id));
+  deleteBookHandles(id);        // 记录删了，配套的文件句柄也一起清
+  deleteBookFiles(id);          // 文件缓存同理，别让它占着磁盘配额
+  buildHistoryList();
+}
+
+function clearHistory(){
+  writeHistory([]);
+  clearAllBookHandles();
+  clearAllBookFiles();
+  buildHistoryList();
+  flash("最近记录已清空");
+}
+
+/* ===================================================================
+   文件句柄持久化（IndexedDB）
+
+   浏览器沙箱不允许网页凭空重读本机文件 —— 但 File System Access API
+   是个例外：通过 showOpenFilePicker 拿到的 FileSystemFileHandle 可以
+   存进 IndexedDB，下次直接 getFile() 读回同一份文件，只需（最多一次）
+   授权确认，不用再翻目录选文件。
+
+   这里存的是 bookId -> [{ name, handle }, ...]。任何一步失败都静默
+   退回"重新选择文件"的老流程，句柄只是锦上添花，绝不能把主流程带崩。
+   =================================================================== */
+
+const HANDLES_DB_NAME = "gushi-reader-handles";
+const HANDLES_STORE = "books";
+
+function idbOpenHandles(){
+  return new Promise((resolve, reject) => {
+    let req;
+    try{ req = indexedDB.open(HANDLES_DB_NAME, 1); }
+    catch(e){ reject(e); return; }   // 无痕模式等场景 indexedDB 可能被禁
+    req.onupgradeneeded = () => {
+      if (!req.result.objectStoreNames.contains(HANDLES_STORE))
+        req.result.createObjectStore(HANDLES_STORE);
+    };
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+}
+
+/** 保存一本书的文件句柄（pairs: [{ name, handle }, ...]） */
+async function saveBookHandles(bookId, pairs){
+  if (!bookId || !pairs || !pairs.length) return;
+  try{
+    const db = await idbOpenHandles();
+    await new Promise((resolve, reject) => {
+      const tx = db.transaction(HANDLES_STORE, "readwrite");
+      tx.objectStore(HANDLES_STORE).put(pairs, bookId);
+      tx.oncomplete = resolve;
+      tx.onerror = () => reject(tx.error);
+    });
+    db.close();
+  }catch(e){ /* 存不进就算了，历史记录里退回重选流程 */ }
+}
+
+/** 读一本书的文件句柄，没有 / 读不到都返回 null */
+async function loadBookHandles(bookId){
+  try{
+    const db = await idbOpenHandles();
+    const v = await new Promise((resolve, reject) => {
+      const tx = db.transaction(HANDLES_STORE, "readonly");
+      const rq = tx.objectStore(HANDLES_STORE).get(bookId);
+      rq.onsuccess = () => resolve(rq.result || null);
+      rq.onerror = () => reject(rq.error);
+    });
+    db.close();
+    return v;
+  }catch(e){ return null; }
+}
+
+async function deleteBookHandles(bookId){
+  try{
+    const db = await idbOpenHandles();
+    await new Promise((resolve) => {
+      const tx = db.transaction(HANDLES_STORE, "readwrite");
+      tx.objectStore(HANDLES_STORE).delete(bookId);
+      tx.oncomplete = resolve;
+      tx.onerror = resolve;
+    });
+    db.close();
+  }catch(e){}
+}
+
+async function clearAllBookHandles(){
+  try{
+    const db = await idbOpenHandles();
+    await new Promise((resolve) => {
+      const tx = db.transaction(HANDLES_STORE, "readwrite");
+      tx.objectStore(HANDLES_STORE).clear();
+      tx.oncomplete = resolve;
+      tx.onerror = resolve;
+    });
+    db.close();
+  }catch(e){}
+}
+
+/* ===================================================================
+   文件本体缓存（IndexedDB 存 File 对象）
+
+   句柄方案有个先天缺口：拖放进来的文件，浏览器不给句柄。
+   但 File 对象本身是 Blob 的子类，可以直接放进 IndexedDB！
+   所以拖进来的书也能「一键重开」——重开时从缓存取回 File 原样
+   重新走一遍导入流程，画质路径完全不变（PDF 仍按 300 DPI 重新渲染）。
+
+   与句柄的分工：
+     - 句柄：读磁盘上的"当前"文件（文件更新后能看到新版本），但要授权；
+     - 缓存：文件的"快照"（之后改了原文件看不到），但零授权、通吃拖放。
+   重开时先试句柄，不行再试缓存，都不行才要求重选。
+
+   单本书总大小超过 BOOK_CACHE_LIMIT 就不缓存（IndexedDB 也有配额，
+   但与其写一半失败，不如明确跳过）；任何失败都静默降级到重选流程。
+   =================================================================== */
+
+const FILES_DB_NAME = "gushi-reader-bookfiles";
+const FILES_STORE = "books";
+const BOOK_CACHE_LIMIT = 1024 * 1024 * 1024;   // 1GB
+
+function idbOpenFiles(){
+  return new Promise((resolve, reject) => {
+    let req;
+    try{ req = indexedDB.open(FILES_DB_NAME, 1); }
+    catch(e){ reject(e); return; }
+    req.onupgradeneeded = () => {
+      if (!req.result.objectStoreNames.contains(FILES_STORE))
+        req.result.createObjectStore(FILES_STORE);
+    };
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+}
+
+/** 把导入的文件本体存为这本书的缓存（files: File 数组） */
+async function cacheBookFiles(bookId, files){
+  if (!bookId || !files || !files.length) return;
+  let total = 0;
+  for (const f of files) total += (f && f.size) || 0;
+  if (total > BOOK_CACHE_LIMIT) return;   // 超限不缓存，重开时走重选
+  try{
+    const db = await idbOpenFiles();
+    await new Promise((resolve, reject) => {
+      const tx = db.transaction(FILES_STORE, "readwrite");
+      tx.objectStore(FILES_STORE).put({
+        files: files.map((f) => ({ name: f.name, type: f.type, blob: f })),
+      }, bookId);
+      tx.oncomplete = resolve;
+      tx.onerror = () => reject(tx.error);
+    });
+    db.close();
+  }catch(e){ /* 配额不足等场景：不缓存，重开时退回重选流程 */ }
+}
+
+/** 读一本书的文件缓存，没有 / 读不到都返回 null */
+async function loadBookFiles(bookId){
+  try{
+    const db = await idbOpenFiles();
+    const v = await new Promise((resolve, reject) => {
+      const tx = db.transaction(FILES_STORE, "readonly");
+      const rq = tx.objectStore(FILES_STORE).get(bookId);
+      rq.onsuccess = () => resolve(rq.result || null);
+      rq.onerror = () => reject(rq.error);
+    });
+    db.close();
+    return v;
+  }catch(e){ return null; }
+}
+
+async function deleteBookFiles(bookId){
+  try{
+    const db = await idbOpenFiles();
+    await new Promise((resolve) => {
+      const tx = db.transaction(FILES_STORE, "readwrite");
+      tx.objectStore(FILES_STORE).delete(bookId);
+      tx.oncomplete = resolve;
+      tx.onerror = resolve;
+    });
+    db.close();
+  }catch(e){}
+}
+
+async function clearAllBookFiles(){
+  try{
+    const db = await idbOpenFiles();
+    await new Promise((resolve) => {
+      const tx = db.transaction(FILES_STORE, "readwrite");
+      tx.objectStore(FILES_STORE).clear();
+      tx.oncomplete = resolve;
+      tx.onerror = resolve;
+    });
+    db.close();
+  }catch(e){}
+}
+
+/** 这本书是否可一键重开（有句柄或有文件缓存），历史列表文案用 */
+async function bookReopenable(bookId){
+  try{
+    const [h, f] = await Promise.all([loadBookHandles(bookId), loadBookFiles(bookId)]);
+    return !!(h && h.length) || !!(f && f.files && f.files.length);
+  }catch(e){ return false; }
+}
+
+/**
+ * 清理已不在历史记录里的孤儿缓存。
+ * 「最近打开」只保留 12 条，被挤出列表的书的句柄与文件缓存要跟着删，
+ * 否则几百 MB 的 PDF 会一直占着用户的磁盘配额。
+ */
+async function pruneOrphanCaches(){
+  let alive = [];
+  try{ alive = readHistory().map((it) => it.id); }catch(e){ return; }
+  const sweep = async (openDb, storeName) => {
+    try{
+      const db = await openDb();
+      const keys = await new Promise((resolve, reject) => {
+        const tx = db.transaction(storeName, "readonly");
+        const rq = tx.objectStore(storeName).getAllKeys();
+        rq.onsuccess = () => resolve(rq.result || []);
+        rq.onerror = () => reject(rq.error);
+      });
+      await Promise.all(keys.map((k) => new Promise((done) => {
+        if (alive.includes(k)){ done(); return; }
+        const tx = db.transaction(storeName, "readwrite");
+        const rq = tx.objectStore(storeName).delete(k);
+        rq.onsuccess = () => done();
+        rq.onerror = () => done();
+      })));
+      db.close();
+    }catch(e){}
+  };
+  await sweep(idbOpenHandles, HANDLES_STORE);
+  await sweep(idbOpenFiles, FILES_STORE);
+}
+
+/** 相对时间：刚刚 / N 分钟前 / N 小时前 / N 天前 */
+function relTime(ts){
+  const s = Math.max(0, (Date.now() - ts) / 1000);
+  if (s < 60) return "刚刚";
+  if (s < 3600) return Math.floor(s / 60) + " 分钟前";
+  if (s < 86400) return Math.floor(s / 3600) + " 小时前";
+  if (s < 86400 * 30) return Math.floor(s / 86400) + " 天前";
+  const d = new Date(ts);
+  return (d.getMonth() + 1) + " 月 " + d.getDate() + " 日";
+}
+
+function buildHistoryList(){
+  const list = $("histList");
+  if (!list) return;
+  const items = readHistory();
+  list.innerHTML = "";
+
+  if (!items.length){
+    const e = document.createElement("div");
+    e.className = "hp-empty";
+    e.textContent = "还没有记录。打开一本书后，这里会记住它。";
+    list.appendChild(e);
+    return;
+  }
+
+  items.forEach((it) => {
+    const row = document.createElement("div");
+    row.className = "hp-item";
+    row.dataset.histId = it.id;
+    if (it.id === state.bookId) row.classList.add("cur");
+    row.title = it.kind === "file"
+      ? "本机文件：「" + it.name + "」"
+      : "点一下重新打开";
+
+    const main = document.createElement("div");
+    main.className = "hp-main";
+    const nm = document.createElement("div");
+    nm.className = "hp-name";
+    nm.textContent = it.name;
+    const sub = document.createElement("div");
+    sub.className = "hp-sub";
+    sub.textContent = relTime(it.at) + " · 共 " + it.total + " 页"
+      + (it.kind === "file" ? " · " : "");
+    main.appendChild(nm);
+    main.appendChild(sub);
+
+    // 本机文件：查一下有没有句柄或文件缓存，有就提示可以一键重开。
+    // 查询是异步的，先按"需重选"渲染，结果回来后再原地更新文案。
+    if (it.kind === "file"){
+      bookReopenable(it.id).then((yes) => {
+        if (yes){
+          row.title = "本机文件：「" + it.name + "」—— 点一下直接打开（可能需要授权一次）";
+          sub.textContent = relTime(it.at) + " · 共 " + it.total + " 页 · 可一键重开";
+        }else{
+          sub.textContent = relTime(it.at) + " · 共 " + it.total + " 页 · 需重新选择文件";
+        }
+      }).catch(() => {});
+    }
+
+    const pg = document.createElement("span");
+    pg.className = "hp-page";
+    pg.textContent = it.page + "/" + it.total;
+
+    const del = document.createElement("button");
+    del.className = "hp-del";
+    del.type = "button";
+    del.textContent = "×";
+    del.title = "从记录中移除";
+    del.addEventListener("click", (e) => {
+      e.stopPropagation();
+      forgetBook(it.id);
+    });
+
+    row.appendChild(main);
+    row.appendChild(pg);
+    row.appendChild(del);
+    row.addEventListener("click", () => openHistoryItem(it, row));
+    list.appendChild(row);
+  });
+}
+
+/** 打开一条历史记录 */
+async function openHistoryItem(it, row){
+  closeHistPanel();
+
+  // 磁盘模式：重新载入 manifest 即可。老记录可能没存 src（字段白名单丢过），
+  // 这种就退回内置数据地址，别误当成"本机文件"去要求重选。
+  if (it.kind === "local"){
+    const src = it.src || DATA_URL;
+    try{
+      $("loading").classList.add("show");
+      const res = await fetch(src + "?t=" + Date.now(), { cache:"no-store" });
+      if (!res.ok) throw new Error("找不到数据文件");
+      const mf = await res.json();
+      applyManifest(mf);
+      state.bookId = it.id;
+      if (it.dir) setDirection(it.dir);
+      if (it.page > 1) {
+        requestAnimationFrame(() => goTo(it.page - 1, false));
+      }
+      return;
+    }catch(err){
+      alert("重新打开失败：" + (err && err.message ? err.message : err));
+      $("loading").classList.remove("show");
+      return;
+    }
+  }
+
+  // 本机文件：优先凭保存的文件句柄直接重开（File System Access API）。
+  // 句柄是当初通过「打开文件」按钮选文件时存下的（见 pickFiles / importFiles）。
+  // 权限还在就直接读；丢了权限就借这次点击的用户激活请求一次授权；
+  // 没存过句柄（拖放进来的书）、授权被拒、文件被移动/改名 —— 才退回
+  // "重新选择文件"的老流程。
+  pendingResume = it;
+  let hadHandles = false;   // 是否存过句柄（兜底提示要按这个分支解释原因）
+  try{
+    const saved = await loadBookHandles(it.id);
+    hadHandles = !!(saved && saved.length);
+    if (hadHandles){
+      const files = [];
+      let ok = true;
+      let stale = false;
+      for (const rec of saved){
+        const h = rec && rec.handle;
+        if (!h){ ok = false; break; }
+        try{
+          let perm = "granted";
+          if (h.queryPermission) perm = await h.queryPermission({ mode:"read" });
+          if (perm !== "granted" && h.requestPermission)
+            perm = await h.requestPermission({ mode:"read" });
+          if (perm !== "granted"){ ok = false; break; }
+          files.push(await h.getFile());
+        }catch(e){
+          // 句柄指向的文件已被移动 / 改名 / 删除
+          ok = false; stale = true; break;
+        }
+      }
+      if (ok && files.length){
+        await importFiles(files);   // importFiles 自己管理进度层
+        return;
+      }
+      if (stale){
+        pendingResume = it;
+        $("empty").classList.add("show");
+        const box = $("empty").querySelector(".box");
+        if (box){
+          box.querySelector("h2").textContent = "找不到原来的文件";
+          box.querySelector("p").innerHTML =
+            "记录「<b>" + escapeHtml(it.name) + "</b>」指向的文件似乎被移动、"
+            + "改名或删除了。<br>重新选一次这个文件即可继续，"
+            + "选好后会自动跳回上次看到的位置。";
+        }
+        if (row) row.querySelector(".hp-spin")?.remove();
+        return;
+      }
+    }
+
+    // 没有句柄 / 句柄用不了：试文件本体缓存（拖放进来的书就是这条路）。
+    // 缓存里存的就是当初导入的 File 对象，取回来原样重新走导入流程，
+    // 不需要任何授权。
+    const cached = await loadBookFiles(it.id);
+    if (cached && cached.files && cached.files.length){
+      const files = [];
+      let ok = true;
+      for (const rec of cached.files){
+        try{
+          files.push(new File([rec.blob], rec.name || "page", { type: rec.type || "" }));
+        }catch(e){ ok = false; break; }
+      }
+      if (ok && files.length){
+        await importFiles(files);   // importFiles 自己管理进度层
+        return;
+      }
+    }
+  }catch(e){ /* 句柄与缓存流程出任何意外，都落到下面的兜底流程 */ }
+
+  // 兜底：提示重新选择。能走到这里说明句柄和缓存都没帮上忙，
+  // 常见原因：这本书是在缓存功能上线前导入的、浏览器数据被清理、
+  // 文件太大没进缓存，或刚才没允许授权。
+  $("empty").classList.add("show");
+  const fallbackBox = $("empty").querySelector(".box");
+  if (fallbackBox){
+    fallbackBox.querySelector("h2").textContent = "请重新选择文件";
+    fallbackBox.querySelector("p").innerHTML =
+      "记录「<b>" + escapeHtml(it.name) + "</b>」在第 <b>" + it.page + "</b> 页。"
+      + "<br>本地没有找到这本书可用的文件缓存"
+      + (hadHandles ? "（刚才的读取授权也没有被允许）" : "")
+      + "，需要你再选一次文件；"
+      + "选好后会自动跳回上次的位置，之后从「最近打开」点开就能一键直达。";
+  }
+  if (row) row.querySelector(".hp-spin")?.remove();
+}
+
+function escapeHtml(s){
+  return String(s).replace(/[&<>"']/g, (c) => (
+    { "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;" }[c]
+  ));
+}
+
+function openHistPanel(){
+  buildHistoryList();
+  closeThemePanel();            // 两个面板不同时开，避免叠在一起
+  $("histPanel").classList.add("open");
+}
+function closeHistPanel(){
+  $("histPanel").classList.remove("open");
+}
+function toggleHistPanel(){
+  if ($("histPanel").classList.contains("open")) closeHistPanel();
+  else openHistPanel();
+}
+
+
+/**
+ * 把 manifest 里的 file 字段解析成真正可用的图片地址。
+ *
+ * 两种来源：
+ *   - 磁盘数据（来自 data/manifest.json）：file 是 "pages/00000.png" 这类相对路径，
+ *     需要补上 "data/" 前缀。
+ *   - 本机导入（拖放 / 选择文件）：file 已经是 blob: 或 data: 地址，直接使用。
+ *
+ * 早期版本无条件拼接 "data/"，导致导入本机文件时地址变成 "data/blob:http://…"
+ * 而图片无法显示，这里按协议前缀区分处理。
+ */
+function pageUrl(p){
+  const f = (p && p.file) || "";
+  if (/^(blob:|data:|https?:|\/)/i.test(f)) return f;
+  return "data/" + f;
+}
+
+/* ---------- 渲染 ---------- */
+function render(){
+  const n = state.pages.length;
+  const lane = laneSlots(state.dir, n);   // domSlot -> srcIdx
+  const frag = document.createDocumentFragment();
+
+  // DOM 顺序 = 格子顺序（从左到右）。每个格子放哪一页由 lane 决定。
+  lane.forEach((srcIdx, slot) => {
+    const p = state.pages[srcIdx];
+    const wrap = document.createElement("div");
+    wrap.className = "page";
+    wrap.dataset.src = String(srcIdx);    // 这个格子装的是第几页（0 基）
+    wrap.dataset.slot = String(slot);
+
+    const sheet = document.createElement("div");
+    sheet.className = "sheet";
+    sheet.style.height = state.fitHeight + "px";
+    // 按原始宽高比预留宽度，不等图片下载完。清单 / pdf.js / 图片导入
+    // 都会带上 w、h，所以这里基本总能算出来；万一带不上就退回让图片自己撑。
+    const ar = (p.w && p.h) ? (p.w / p.h) : 0;
+    if (ar > 0){
+      sheet.dataset.ar = String(ar);            // applyScale 换缩放时还要用
+      sheet.style.width = Math.round(state.fitHeight * ar) + "px";
+    }
+
+    const img = document.createElement("img");
+    img.alt = p.label || ("第 " + (srcIdx + 1) + " 页");
+    img.decoding = "async";
+    img.draggable = false;
+    // 高分辨率扫描件靠浏览器原生缩放，不做任何二次采样，画质不被削弱
+    img.loading = "eager";
+    // PDF 懒渲染：还没轮到渲染的页先摆个带转圈的空架子，
+    // 宽高比已经预留好，渲染完成后 paintPage 会补上图，布局不跳。
+    if (p.pending){
+      sheet.classList.add("pending");
+      img.style.visibility = "hidden";
+    }else{
+      img.src = pageUrl(p);
+    }
+
+    sheet.appendChild(img);
+
+    const num = document.createElement("div");
+    num.className = "pnum";
+    num.textContent = "第 " + (srcIdx + 1) + " 页";   // 页标按语义页码，不按格子号
+    sheet.appendChild(num);
+
+    wrap.appendChild(sheet);
+    frag.appendChild(wrap);
+  });
+
+  track.innerHTML = "";
+  track.appendChild(frag);
+  // 聚焦模式在方向切换 / 换书重渲染后依然有效
+  markFocusPage();
+}
+
+/* ---------- 定位 ---------- */
+/** 当前页（语义页码 state.idx）在 DOM 里的格子元素 */
+function currentEl(){
+  return pageEl(state.idx);
+}
+
+function targetX(){
+  const el = currentEl();
+  if (!el) return 0;
+  const stageW = stage.clientWidth;
+  // 坐标基准要对齐，否则会整整偏出一大截。
+  //
+  // #track 上有 will-change:transform，它因此成了包含块，于是
+  // el.offsetLeft 是相对**轨道**量的，不含轨道自己在舞台里的位置。
+  // 而内容比舞台宽时，main 的 justify-content:center 会把轨道摆到负位置
+  // （6 页的书实测 -643px）。漏掉这一段，当前页就会被推到左边、露出
+  // 一大片空白 —— 这就是"第一页不在该在的位置"的来源。
+  const x = track.offsetLeft + el.offsetLeft + el.offsetWidth / 2 - stageW / 2;
+  return -x;
+}
+
+function alignToCurrent(animate){
+  // 缩放模式下由滚动条定位，不要再平移轨道
+  if (isZoomed()) return;
+  track.classList.toggle("instant", !animate);
+  track.style.transform = "translate3d(" + targetX() + "px,0,0)";
+  if (!animate){
+    // 强制回流后再恢复过渡，避免下一帧动画从错误位置开始
+    void track.offsetHeight;
+    track.classList.remove("instant");
+  }
+}
+
+/* ---------- 导航 ---------- */
+/**
+ * 跳到第 pageNo 页（1 基的语义页码）。
+ * next() / prev() 都汇到这里，两种装帧方向共用同一套语义。
+ */
+function goTo(pageNo, animate = true){
+  const total = state.pages.length;
+  if (!total) return;
+  const clamped = Math.max(0, Math.min(total - 1, pageNo));
+  state.idx = clamped;
+
+  // 这是程序化跳页，位置由我们说了算：
+  // 解除"用户已接管滚动位置"的状态，让后续布局变化仍会把他要看的这一页贴正。
+  userOwnsScroll = false;
+
+  // 翻书模式没有轨道可平移：直接把这张纸摆上来（滑块/跳转/缩略图都汇到这里）
+  if (bookMode()){
+    layoutBook();
+    updateChrome();
+    markThumb();
+    return;
+  }
+
+  if (isZoomed()){
+    scrollCurrentIntoView(animate);
+  } else {
+    alignToCurrent(animate);
+  }
+  updateChrome();
+  markThumb();
+}
+
+/** 下一页 = 语义页码 +1（往后读一页），与装帧方向无关 */
+function next(){
+  if (bookMode()){ bookFlip(1); return; }
+  if (state.idx >= state.pages.length - 1){ bump(1); return; }
+  goTo(state.idx + 1);
+}
+
+/** 上一页 = 语义页码 -1 */
+function prev(){
+  if (bookMode()){ bookFlip(-1); return; }
+  if (state.idx <= 0){ bump(-1); return; }
+  goTo(state.idx - 1);
+}
+
+/** 到头时给一点回弹提示，dir 表示被挡住的推进方向 */
+function bump(dir){
+  const dx = dir > 0 ? -7 : 7;
+  stage.animate(
+    [{ transform:"translateX(0)" }, { transform:`translateX(${dx}px)` }, { transform:"translateX(0)" }],
+    { duration:180, easing:"ease-out" }
+  );
+}
+
+/* ===================================================================
+   翻书模式 —— 一屏摊开一「跨」，像一本摊在桌上的书
+     - 跨（cross）是布局单位，一屏正好一跨：
+         · 对开页（源图宽高比 >= 1.15，即 PDF 一页里就印着左右两面书）
+           独占一跨、整张居中铺开 —— 绝不拆开，拆开会打乱原书顺序；
+         · 单页扫描两两配成一跨：右开本先读页在右、次读页在左
+           （左开本反之），两侧都有纸，和实体书摊在桌上一样；
+         · 全书只有一页时整张居中，像一张纸平放在桌上。
+     - 任何一页都是完整原页：不裁切、不旋转、不重排。
+     - 页码 state.idx 与连续模式一一对应（指向跨内首页）；
+       翻一次跨，跨内顺序永远跟随源文件。
+   =================================================================== */
+const VIEW_KEY = "gushi-reader-view";
+const BOOK_SPREAD_AR = 1.15;   // 宽高比达到该值视为「一页含左右两面」的对开扫描
+const BOOK_MARGIN = 14;        // 纸与窗口边缘的留白
+const BOOK_SPINE_GAP = 3;      // 纸的装订缘与书脊之间的细缝
+
+function bookMode(){ return state.view === "book" && state.ready; }
+function isSpreadPage(p){ return !!(p && p.w && p.h && (p.w / p.h) >= BOOK_SPREAD_AR); }
+function bookRTL(){ return state.dir === "right-to-left"; }
+
+/** 第 i 页的宽高比；尺寸未知时给个古籍常见的窄长条比例 */
+function arOf(i){
+  const p = state.pages[i];
+  return (p && p.w && p.h) ? (p.w / p.h) : 0.7;
+}
+
+/** 把页面切成「跨」：对开页独占一跨，相邻单页两两配跨 */
+function buildCrosses(){
+  const n = state.pages.length;
+  const out = [];
+  let i = 0;
+  while (i < n){
+    if (isSpreadPage(state.pages[i])){
+      out.push({ kind: "full", pages: [i] });
+      i += 1;
+    } else if (i + 1 < n && !isSpreadPage(state.pages[i + 1])){
+      out.push({ kind: "pair", pages: [i, i + 1] });
+      i += 2;
+    } else {
+      out.push({ kind: "single", pages: [i] });   // 落单页（含与对开页相邻者）
+      i += 1;
+    }
+  }
+  return out;
+}
+
+/** 跨列表（按页数缓存；换书 / 重新导入时由 invalidateCrosses 清空） */
+function crosses(){
+  if (!state._crosses || state._crossesFor !== state.pages.length){
+    state._crosses = buildCrosses();
+    state._crossesFor = state.pages.length;
+  }
+  return state._crosses;
+}
+function invalidateCrosses(){ state._crosses = null; state._crossesFor = -1; }
+
+/** 第 pageIdx 页落在第几跨 */
+function crossIndexAt(pageIdx){
+  const cs = crosses();
+  for (let k = 0; k < cs.length; k++){
+    const ps = cs[k].pages;
+    if (pageIdx >= ps[0] && pageIdx <= ps[ps.length - 1]) return k;
+  }
+  return 0;
+}
+
+/**
+ * 算一跨怎么摆：返回 { H, items:[{slot,idx,left,w}] }，slot ∈ "L" | "F" | "R"。
+ * 每页按自身宽高比缩放，绝不拉伸；纸高统一为 H，纸宽各自随比例，
+ * 因此两张不同开本的扫描页并排时也不会变形。
+ */
+function planCross(cross, W, baseH){
+  const spineX = W / 2;
+  const rtl = bookRTL();
+  const items = [];
+  let H = baseH;
+
+  if (cross.kind === "full" || state.pages.length === 1){
+    // 整张：居中铺开（对开扫描 / 全书仅一页）
+    const a = arOf(cross.pages[0]);
+    const avail = Math.max(120, W - BOOK_MARGIN * 2);
+    if (a * H > avail) H = Math.max(140, Math.floor(avail / a));
+    const w = H * a;
+    items.push({ slot: "F", idx: cross.pages[0], left: Math.round(spineX - w / 2), w: Math.round(w) });
+    return { H, spineX, rtl, items };
+  }
+
+  // 配对 / 落单：每张纸贴书脊，宽度受半屏约束
+  const availHalf = Math.max(110, W / 2 - BOOK_MARGIN - BOOK_SPINE_GAP);
+  const ars = cross.pages.map((i) => arOf(i));
+  ars.forEach((a) => { if (a * H > availHalf) H = Math.max(120, Math.floor(availHalf / a)); });
+
+  cross.pages.forEach((idx, k) => {
+    const w = H * ars[k];
+    const first = (k === 0);                 // 先读页
+    const onRight = first ? rtl : !rtl;      // 右开本：先读页在右；左开本反之
+    const left = onRight ? (spineX + BOOK_SPINE_GAP) : (spineX - BOOK_SPINE_GAP - w);
+    items.push({ slot: onRight ? "R" : "L", idx, left: Math.round(left), w: Math.round(w) });
+  });
+  return { H, spineX, rtl, items };
+}
+
+/** 把一个 leaf 藏起来（移出视野，同时断开图片） */
+function hideLeaf(el){
+  el._leafIdx = -1;
+  el.style.display = "none";
+  const im = el.querySelector("img");
+  if (im) im.removeAttribute("src");
+}
+
+/** 把第 idx 页摆进一个 leaf 容器；未渲染的页先转圈，渲染完就地补图 */
+function fillLeaf(el, idx, rect){
+  const p = state.pages[idx];
+  el._leafIdx = idx;
+  el.style.display = "";
+  el.style.left = rect.left + "px";
+  el.style.width = rect.w + "px";
+  el.style.height = rect.h + "px";
+  let img = el.querySelector("img");
+  if (!img){
+    img = document.createElement("img");
+    img.decoding = "async";
+    img.draggable = false;
+    el.appendChild(img);
+  }
+  el.classList.toggle("pend", !!p.pending && !p._failed);
+  el.classList.toggle("pend-fail", !!p._failed);
+  if (p.pending && !p._failed){
+    img.removeAttribute("src");
+    // paintPage 只管连续模式的轨道，翻书模式的槽位自己补图。
+    // 回填前核对 _leafIdx：动画期间容器可能已被挪作别的页。
+    ensurePageRendered(idx).then(() => {
+      if (el._leafIdx !== idx) return;
+      const np = state.pages[idx];
+      el.classList.toggle("pend", !!np.pending && !np._failed);
+      el.classList.toggle("pend-fail", !!np._failed);
+      if (!np.pending && !np._failed) img.src = pageUrl(np);
+      else img.removeAttribute("src");
+    }).catch(() => {});
+  } else {
+    // 渲染失败的页没有可用的图（file 还是空串），别喂 "data/" 进去
+    if (p.pending || p._failed) img.removeAttribute("src");
+    else img.src = pageUrl(p);
+  }
+}
+
+/** 摆好当前这一跨（无动画的静态布局；模式切换/跳页/换书/改方向都走这里） */
+function layoutBook(){
+  if (!bookMode() || !state.pages.length) return;
+  const area = $("bookArea");
+  const W = Math.max(320, stage.clientWidth);
+  const baseH = Math.max(200, stage.clientHeight - 84);
+  const cross = crosses()[crossIndexAt(state.idx)];
+  const plan = planCross(cross, W, baseH);
+
+  area.style.width = W + "px";
+  area.style.height = plan.H + "px";
+  area.dataset.kind = cross.kind;
+
+  paintCross(cross, plan);
+  paintGutter(cross, plan, W);
+  paintBookNum(cross);
+}
+
+/** 把一跨的纸铺到静态层：对开页占整张槽，配对的两页分占左右槽 */
+function paintCross(cross, plan){
+  const L = $("bookL"), R = $("bookR"), F = $("bookFull");
+  hideLeaf(L); hideLeaf(R); hideLeaf(F);
+  plan.items.forEach((it) => {
+    const el = it.slot === "F" ? F : (it.slot === "L" ? L : R);
+    fillLeaf(el, it.idx, { left: it.left, w: it.w, h: plan.H });
+  });
+}
+
+/** 书脊阴影：双侧有纸（整张/配对）压在正中，落单页贴在它靠书脊的那条边 */
+function paintGutter(cross, plan, W){
+  const g = $("bookGutter");
+  const slot0 = plan.items.length ? plan.items[0].slot : "F";
+  if (cross.kind === "pair" || slot0 === "F"){
+    g.className = "g-spread";
+    g.style.left = (W / 2 - 24) + "px";
+    g.style.width = "48px";
+  } else if (slot0 === "R"){          // 纸在右半：装订侧是它的左缘
+    g.className = "g-in";
+    g.style.left = (W / 2 - 6) + "px";
+    g.style.width = "30px";
+  } else {                             // 纸在左半：装订侧是它的右缘
+    g.className = "g-out";
+    g.style.left = (W / 2 - 24) + "px";
+    g.style.width = "30px";
+  }
+}
+
+/** 页码：一屏一跨，配对页报出跨内页序范围（如「第 3–4 页」） */
+function paintBookNum(cross){
+  const total = state.pages.length;
+  const ps = cross.pages;
+  const a = ps[0] + 1, b = ps[ps.length - 1] + 1;
+  const span = (a === b) ? ("第 " + a + " 页") : ("第 " + a + "–" + b + " 页");
+  $("bookNum").textContent = span + " / 共 " + total + " 页";
+}
+
+/** 带超时地等一个 Promise（翻页不能被渲染慢的页卡死） */
+function withTimeout(pr, ms){
+  return Promise.race([ Promise.resolve(pr), new Promise((r) => setTimeout(r, ms)) ]);
+}
+
+let flipBusy = false;
+let queuedFlip = 0;   // 动画期间记下的最后一次翻页请求，结束后补上
+
+/** 把某一页摆到书脊的指定一侧（翻页动画期间按「侧」摆纸用） */
+function paintSide(slot, idx, W, H){
+  if (idx < 0 || idx >= state.pages.length) return;
+  const w = Math.round(H * arOf(idx));
+  const spineX = W / 2;
+  const left = slot === "R" ? (spineX + BOOK_SPINE_GAP)
+                            : (spineX - BOOK_SPINE_GAP - w);
+  fillLeaf(slot === "R" ? $("bookR") : $("bookL"), idx, { left: Math.round(left), w, h: H });
+}
+
+/**
+ * 翻一跨（带动画）。dirSign = +1 往后翻 / -1 往回翻。
+ *   配对跨之间：把「先读侧」那张纸绕书脊翻到另一侧 ——
+ *     前进：当前跨的先读页（右开本在右）翻向左边，纸背正好是目标跨的
+ *           次读页，被它让出的位置露出目标跨的先读页；
+ *     后退：同一张纸反着转回去，正面重新出现。
+ *   涉及对开页（整张占满一跨、横跨书脊）时不走 3D：那种纸比半屏还宽，
+ *   绕书脊转会甩出画面，直接用淡换，干净且不误导。
+ */
+async function bookFlip(dirSign){
+  if (!bookMode()) return;
+  if (flipBusy){ queuedFlip = dirSign; return; }
+  const cs = crosses();
+  const cur = crossIndexAt(state.idx);
+  const nextCross = cur + dirSign;
+  if (nextCross < 0 || nextCross >= cs.length){ bump(dirSign); return; }
+  const forward = dirSign > 0;
+  const from = cs[cur], to = cs[nextCross];
+
+  flipBusy = true;
+  // 两跨的纸先就绪，免得翻过去只看到转圈。本地 blob 渲染通常几十毫秒，
+  // 慢页最多等 1.6s，不把动画卡死
+  try{
+    await withTimeout(Promise.all(from.pages.concat(to.pages).map((i) => ensurePageRendered(i))), 1600);
+  }catch(e){}
+  if (!bookMode()){ flipBusy = false; return; }
+
+  const finishBusy = () => {
+    flipBusy = false;
+    if (queuedFlip && bookMode()){
+      const q = queuedFlip; queuedFlip = 0;
+      bookFlip(q);
+    } else {
+      queuedFlip = 0;
+    }
+  };
+  const settle = () => {
+    state.idx = to.pages[0];
+    layoutBook();      // 以目标跨的正式布局收尾（含书脊阴影、页码）
+    updateChrome();
+    markThumb();
+    finishBusy();
+  };
+
+  // 含对开页的跨：淡换
+  if (from.kind === "full" || to.kind === "full"){
+    const area = $("bookArea");
+    const wrap = $("bookFlipWrap");
+    wrap.classList.remove("anim");
+    wrap.style.left = "-9999px";
+    area.style.transition = "opacity .16s ease";
+    area.style.opacity = "0";
+    setTimeout(() => {
+      state.idx = to.pages[0];
+      layoutBook();
+      updateChrome();
+      markThumb();
+      area.style.opacity = "1";
+      setTimeout(() => { area.style.transition = ""; finishBusy(); }, 180);
+    }, 170);
+    return;
+  }
+
+  const area = $("bookArea");
+  const W = area.clientWidth || stage.clientWidth;
+  const baseH = Math.max(200, stage.clientHeight - 84);
+  const toPlan = planCross(to, W, baseH);
+  const H = toPlan.H;
+  const rtl = bookRTL();
+  const spineX = W / 2;
+  const idxOf = (cross, k) => (cross.pages[k] === undefined ? -1 : cross.pages[k]);
+
+  // 静态层：先读侧直接摆目标跨的先读页（纸让开就露出它）；
+  // 次读侧前进时留着旧页等纸盖上来，后退时先摆目标页等纸翻走露出来
+  const L = $("bookL"), R = $("bookR"), F = $("bookFull");
+  hideLeaf(L); hideLeaf(R); hideLeaf(F);
+  const firstSlot = rtl ? "R" : "L";
+  const secondSlot = rtl ? "L" : "R";
+  paintSide(firstSlot, idxOf(to, 0), W, H);
+  paintSide(secondSlot, forward ? idxOf(from, 1) : idxOf(to, 1), W, H);
+
+  // 翻动的那张纸：一律按目标跨先读页的尺寸，落在先读位
+  const paperW = Math.max(1, Math.round(H * arOf(to.pages[0])));
+  const wrapLeft = rtl ? (spineX + BOOK_SPINE_GAP)
+                       : (spineX - BOOK_SPINE_GAP - paperW);
+  const wrap = $("bookFlipWrap");
+  const flip = wrap.querySelector(".flip");
+  const front = flip.querySelector(".face.front");
+  const back = flip.querySelector(".face.back");
+  front.innerHTML = ""; back.innerHTML = "";
+
+  const frontIdx = forward ? idxOf(from, 0) : idxOf(to, 0);
+  const backIdx = forward ? idxOf(to, 1) : idxOf(from, 1);
+  [[front, frontIdx], [back, backIdx]].forEach(([face, i]) => {
+    if (i < 0) return;
+    const p = state.pages[i];
+    if (p.pending || p._failed) return;
+    const im = document.createElement("img");
+    im.draggable = false;
+    im.src = pageUrl(p);
+    face.appendChild(im);
+  });
+
+  wrap.style.left = wrapLeft + "px";
+  wrap.style.width = paperW + "px";
+  wrap.style.height = H + "px";
+
+  // 纸的转轴永远在书脊上（先读位的装订缘），转过来正好落在另一侧
+  const advance = rtl ? -180 : 180;
+  flip.style.transformOrigin = (rtl ? "0%" : "100%") + " 50%";
+  flip.style.transform = "rotateY(" + (forward ? 0 : advance) + "deg)";
+
+  const finish = () => {
+    wrap.classList.remove("anim");
+    wrap.style.left = "-9999px";
+    front.innerHTML = ""; back.innerHTML = "";
+    settle();
+  };
+
+  // 先以初始角摆好（无过渡），下一帧再挂过渡类转到目标角
+  void flip.offsetHeight;
+  wrap.classList.add("anim");
+  flip.style.transform = "rotateY(" + (forward ? advance : 0) + "deg)";
+  setTimeout(finish, 620);   // 比过渡略长，不依赖 transitionend 的时序可靠性
+}
+
+/** 切换 连续滚动 / 翻书 视图 */
+function setViewMode(mode){
+  const toBook = mode === "book";
+  if ((state.view === "book") === toBook) return;
+  state.view = toBook ? "book" : "scroll";
+  try{ localStorage.setItem(VIEW_KEY, state.view); }catch(e){}
+  document.body.dataset.view = state.view;
+  $("btnView").setAttribute("aria-pressed", String(toBook));
+  if (!state.ready) return;
+
+  if (toBook){
+    // 翻书视图按适应高度摆纸，不吃缩放：切进来先把缩放态收掉
+    if (isZoomed()){
+      state.zoom = 1;
+      stage.classList.remove("zoomed");
+      stage.scrollLeft = 0;
+      applyScale();
+    }
+    layoutBook();
+    updateChrome();
+    flash("翻书模式：点两侧翻页，B 键退出");
+  } else {
+    // 回到连续轨道，把当前页重新贴到正中
+    requestAnimationFrame(() => { if (!isZoomed()) alignToCurrent(false); });
+  }
+}
+function toggleViewMode(){ setViewMode(state.view === "book" ? "scroll" : "book"); }
+
+function updateChrome(){
+  const total = state.pages.length;
+  const cur = total ? state.idx + 1 : 0;
+  pageLabel.innerHTML = "<b>" + cur + "</b> / " + total;
+  slider.max = String(Math.max(0, total - 1));
+  slider.value = String(state.idx);
+
+  // 到头判断：连续模式看页码，翻书模式看「跨」（一屏可能含两页）
+  let atStart = state.idx <= 0, atEnd = state.idx >= total - 1;
+  if (bookMode() && total){
+    const cs = crosses();
+    const k = crossIndexAt(state.idx);
+    atStart = k <= 0;
+    atEnd = k >= cs.length - 1;
+  }
+  btnPrev.disabled = atStart;
+  btnNext.disabled = atEnd;
+
+  // 翻到哪就先把哪页（含相邻页）渲染出来；后台队列会被它插队
+  requestPagesAround(state.idx);
+
+  // 聚焦模式：当前页变了，清晰页也要跟着挪
+  markFocusPage();
+
+  // 顺手把「读到哪了」写回历史。用防抖是因为快速翻页时
+  // updateChrome 会被高频调用，而 localStorage 是同步 IO。
+  scheduleBookmark();
+}
+
+/** 防抖写入当前书的进度（300ms 内的连续翻页只写一次） */
+let bookmarkTimer = 0;
+function scheduleBookmark(){
+  clearTimeout(bookmarkTimer);
+  bookmarkTimer = setTimeout(touchCurrentBook, 300);
+}
+
+/* ---------- 缩略图 ---------- */
+function buildThumbs(){
+  thumbStrip.innerHTML = "";
+  const frag = document.createDocumentFragment();
+  // 缩略图按语义页码排列（第1页在最前），方便定位；点击直接跳到该页
+  state.pages.forEach((p, srcIdx) => {
+    const d = document.createElement("div");
+    d.className = "t";
+    d.dataset.src = String(srcIdx);
+    d.title = "第 " + (srcIdx + 1) + " 页";
+    const im = document.createElement("img");
+    // 未渲染的 PDF 页先不给 src，等 paintPage 补上（否则会是破图）
+    if (!p.pending) im.src = pageUrl(p);
+    im.loading = "lazy";
+    im.alt = d.title;
+    d.appendChild(im);
+    d.addEventListener("click", () => goTo(srcIdx));
+    frag.appendChild(d);
+  });
+  thumbStrip.appendChild(frag);
+  markThumb();
+}
+
+function markThumb(){
+  thumbStrip.querySelectorAll(".t.cur").forEach((e) => e.classList.remove("cur"));
+  const t = thumbStrip.querySelector('.t[data-src="' + state.idx + '"]');
+  if (t){
+    t.classList.add("cur");
+    if (thumbs.classList.contains("open")){
+      t.scrollIntoView({ block:"nearest", inline:"center", behavior:"smooth" });
+    }
+  }
+}
+
+/* ---------- 方向切换 ---------- */
+/**
+ * 应用装帧方向。
+ * 只改变「第 1 页摆在哪一端」，不改变语义页码，也不改变按钮指向。
+ * @param {string} dir      目标方向
+ */
+function setDirection(dir){
+  if (!state.pages.length){ state.dir = dir; return; }
+  state.dir = dir;
+
+  const rtl = dir === "right-to-left";
+  dirRTL.setAttribute("aria-pressed", String(rtl));
+  dirLTR.setAttribute("aria-pressed", String(!rtl));
+  dirHint.textContent = rtl ? "右开本 · 第1页在右" : "左开本 · 第1页在左";
+  // 滚动提示里的方向词也要跟着改
+  if (isZoomed()) $("zoomHint").textContent = rtl ? "滚动条从右向左拖" : "滚动条从左向右拖";
+
+  // 重排轨道后仍停在同一个语义页码上
+  render();
+  buildThumbs();
+  updateChrome();
+  // 翻书模式下换方向，纸张的摆位（书脊一侧、阴影方向）要跟着重算
+  if (bookMode()) layoutBook();
+
+  // 换了装帧方向，滚动条的方向也跟着换：右开本要从最右端起步
+  requestAnimationFrame(() => {
+    if (isZoomed()){
+      resetScrollStart();
+      scrollCurrentIntoView(false);
+    } else {
+      alignToCurrent(false);
+    }
+  });
+}
+
+/* ---------- 载入 ---------- */
+async function boot(){
+  // 环境自检：入口地址、存储可持久性。不阻塞界面，先亮起来再说。
+  try{ initEnv(); }catch(e){}
+
+  // 阅读底色：先恢复上次选择，再渲染列表。
+  // 放在最前面，空状态页也能用底色功能。
+  buildThemeList();
+  let savedTheme = null;
+  try { savedTheme = localStorage.getItem(THEME_KEY); } catch(e){}
+  applyTheme(savedTheme || "paper");
+
+  // 聚焦模式：恢复上次的选择（开/关 + 范围一页或两页）
+  let savedFocus = "0", savedScope = "1";
+  try { savedFocus = localStorage.getItem(FOCUS_KEY) || "0"; } catch(e){}
+  try { savedScope = localStorage.getItem(FOCUS_SCOPE_KEY) || "1"; } catch(e){}
+  state.focusScope = savedScope === "2" ? "2" : "1";
+  setFocusMode(savedFocus === "1");
+
+  // 视图模式：恢复上次是连续滚动还是翻书
+  let savedView = "scroll";
+  try { savedView = localStorage.getItem(VIEW_KEY) || "scroll"; } catch(e){}
+  state.view = savedView === "book" ? "book" : "scroll";
+  document.body.dataset.view = state.view;
+  $("btnView").setAttribute("aria-pressed", String(state.view === "book"));
+
+  $("loading").classList.add("show");
+  let mf = null;
+  try{
+    const res = await fetch(DATA_URL, { cache:"no-store" });
+    if (res.ok) mf = await res.json();
+  }catch(e){ /* 常见于 file:// 直接打开时的跨域限制 */ }
+
+  // 兜底：用 <script> 引入的清单副本。file:// 下 fetch() 一定失败，
+  // 但 script 标签不受此限，所以双击打开也能看到演示库，而不是一片空。
+  if ((!mf || !mf.pages || !mf.pages.length) && window.__GUSHI_MANIFEST){
+    mf = window.__GUSHI_MANIFEST;
+  }
+
+  if (!mf || !mf.pages || !mf.pages.length){
+    $("loading").classList.remove("show");
+    $("empty").classList.add("show");
+    adviceForFileMode();     // 双击打开又读不到库：把该怎么做说清楚
+    return;
+  }
+
+  // 磁盘模式的书籍：页面是相对路径，可以凭 manifest 地址直接重新打开，
+  // 所以连同地址一起记进历史。id 用固定值，保证同一本书只有一条记录。
+  const bookId = "local:" + mf.title;
+
+  // 先取出"上次读到哪一页"，再 applyManifest —— 后者会把 state 重置。
+  // 以前这里写死 page: 1，等于每次打开/刷新都把进度抹掉，
+  // 「最近打开」里的页码就永远停在 1/6，续读形同虚设。
+  const prevRec = readHistory().find((it) => it.id === bookId) || null;
+  const resumePage = prevRec && prevRec.page > 1
+    ? Math.min(prevRec.page, mf.pages.length)
+    : 1;
+
+  applyManifest(mf, { bookId: bookId });
+  rememberBook({
+    id: bookId,
+    name: mf.title || "右翻书古籍阅读器",
+    kind: "local",
+    src: DATA_URL,
+    total: mf.pages.length,
+    page: resumePage,
+    dir: state.dir,
+    theme: state.theme,
+  });
+
+  // 接着上次的位置读下去，而不是每次都从第 1 页重新开始
+  if (resumePage > 1){
+    requestAnimationFrame(() => goTo(resumePage - 1, false));
+    flash("已回到第 " + resumePage + " 页");
+  }
+}
+
+/* ---------- 应用一份 manifest 并开始阅读 ---------- */
+function applyManifest(mf, opts){
+  const o = opts || {};
+  // 关键：manifest 里的 pages 数组必须是「第 1 页在前」的自然顺序。
+  // 显示时的左右摆位由 laneSlots() 依据装帧方向处理，不在这里调整顺序。
+  state.pages = mf.pages;
+  invalidateCrosses();           // 换了书：翻书模式的「跨」划分要重算
+  state.title = mf.title || "右翻书古籍阅读器";
+  state.bookId = o.bookId || "";
+  // 优先沿用页面上当前选择的装帧方向（用户可能手动切过），
+  // 其次参考 manifest 记录的方向。
+  if (!state.userPickedDir){
+    state.dir = mf.direction === "left-to-right" ? "left-to-right" : "right-to-left";
+  }
+
+  $("bookTitle").textContent = state.title;
+  // 应用名放最前：浏览器标签页宽度有限会截断标题，
+  // 放在前面才能保证「右翻书古籍阅读器」始终可见。
+  document.title = "右翻书古籍阅读器 · " + state.title;
+
+  // 同步顶栏的装帧方向按钮
+  const rtl = state.dir === "right-to-left";
+  dirRTL.setAttribute("aria-pressed", String(rtl));
+  dirLTR.setAttribute("aria-pressed", String(!rtl));
+  dirHint.textContent = rtl ? "右开本 · 第1页在右" : "左开本 · 第1页在左";
+
+  state.idx = 0;                 // 永远从第 1 页开始
+  state.zoom = 1;
+  stage.classList.remove("zoomed");
+  stage.scrollLeft = 0;
+  computeFitHeight();
+  render();
+  buildThumbs();
+  updateChrome();
+  requestAnimationFrame(() => alignToCurrent(false));
+
+  $("loading").classList.remove("show");
+  $("empty").classList.remove("show");
+  state.ready = true;
+  // 上次退出时用的是翻书模式：新书一开门就进对开视图。
+  // rAF 在被节流的后台标签页里可能迟迟不来，再补一个 setTimeout 兜底
+  if (state.view === "book"){
+    requestAnimationFrame(layoutBook);
+    setTimeout(() => { if (state.view === "book" && state.ready) layoutBook(); }, 150);
+  }
+}
+
+/* ===================================================================
+   本机文件导入
+   全部在浏览器内完成：PDF 用 pdf.js 解析，图片用原始 File 对象，
+   不经过任何服务器，文件不会被上传。
+   =================================================================== */
+
+// PDF 解析库：优先用随程序自带的本地副本（vendor/pdfjs/），
+// 断网、内网、CDN 被墙的环境都能用；本地副本缺失时才退回 CDN。
+// 早先是"只用 CDN"，一旦 cdnjs 连不上就表现为"导入 PDF 后什么都没有"。
+const PDFJS_LOCAL = "vendor/pdfjs/pdf.min.js";
+const PDFJS_LOCAL_WORKER = "vendor/pdfjs/pdf.worker.min.js";
+const PDFJS_CDN = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js";
+const PDFJS_CDN_WORKER = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+
+let pdfjsReady = null;
+let pdfjsSource = "未加载";   // 本地 / CDN / 内存，供诊断
+
+/** 插一个 <script>，成功与否都用布尔回报（不抛异常） */
+function loadScript(src){
+  return new Promise((resolve) => {
+    const s = document.createElement("script");
+    s.src = src;
+    s.onload = () => resolve(!!window.pdfjsLib);
+    s.onerror = () => resolve(false);
+    document.head.appendChild(s);
+  });
+}
+
+/** 探测某个 URL 是否取得到（只有 http/https 下能探；file:// 直接放行） */
+async function urlReachable(url){
+  if (!/^https?:$/.test(location.protocol)) return true;
+  try{
+    const r = await fetch(url, { method: "HEAD", cache: "no-store" });
+    return r.ok;
+  }catch(e){ return false; }
+}
+
+function ensurePdfjs(){
+  if (pdfjsReady) return pdfjsReady;
+  pdfjsReady = (async () => {
+    if (window.pdfjsLib){
+      pdfjsSource = "预载";      // 页面 <script> 已经引了（正常是本地副本）
+    } else if (await loadScript(PDFJS_LOCAL)){
+      pdfjsSource = "本地";
+    } else if (await loadScript(PDFJS_CDN)){
+      pdfjsSource = "CDN";
+    } else {
+      throw new Error(
+        "PDF 解析库没能载入。\n" +
+        "本地文件 vendor/pdfjs/pdf.min.js 没找到（请确认随程序一起拷贝过来），" +
+        "同时云端 CDN 也连不上（可能是断网或被拦截）。\n" +
+        "把 vendor 目录补齐，或联网后重试即可。"
+      );
+    }
+    // worker 同理：本地在就用本地，否则退回 CDN
+    const useLocalWorker = await urlReachable(PDFJS_LOCAL_WORKER);
+    window.pdfjsLib.GlobalWorkerOptions.workerSrc = useLocalWorker ? PDFJS_LOCAL_WORKER : PDFJS_CDN_WORKER;
+    if (!useLocalWorker) pdfjsSource += " + CDN worker";
+    return window.pdfjsLib;
+  })();
+  // 失败不留缓存：网络恢复后再点一次导入就能成，而不是一次失败永久坏掉
+  pdfjsReady.catch(() => { pdfjsReady = null; });
+  return pdfjsReady;
+}
+
+function setProgress(text, ratio, sub){
+  const p = $("progress");
+  p.classList.add("on");
+  $("progText").textContent = text;
+  $("progBar").style.width = Math.round(Math.max(0, Math.min(1, ratio)) * 100) + "%";
+  $("progSub").textContent = sub || "";
+}
+function hideProgress(){ $("progress").classList.remove("on"); }
+
+/* --- 把 PDF 变成书页 --- */
+/**
+ * 解析 PDF（快，秒级）。
+ *
+ * 这里只做两件事：解析文档结构、读取每页的几何尺寸（宽高比），
+ * **不做任何像素渲染**。真正的渲染由懒渲染管理器按需进行——
+ * 用户翻到哪页才渲染哪页，其余页面由后台队列慢慢补齐。
+ * 之前是整本全部渲染完才开门，80 页的书要干等一两分钟。
+ *
+ * 每页带一个 _render() 闭包，捕获 pdf.js 文档对象和页号，
+ * 由管理器在合适的时机调用。文档对象必须保持存活直到这本书被换掉
+ * （换书时由 disposeBookRenderers 统一销毁）。
+ */
+async function loadPdf(file, onProgress){
+  const pdfjsLib = await ensurePdfjs();
+  onProgress(0, 1, "正在打开 PDF");
+  const buf = await file.arrayBuffer();
+  const doc = await pdfjsLib.getDocument({
+    data: buf,
+    // 关掉用不上的功能，降低内存占用
+    disableAutoFetch: true,
+    disableStream: true,
+  }).promise;
+  RENDER.docs.push(doc);
+
+  const total = doc.numPages;
+  // 扫描件常见 200~400 DPI。按页面尺寸推断倍率：
+  // 页面宽度(pt) × scale / 72 = 目标 DPI。取 300 DPI 对应的倍率。
+  const TARGET_DPI = 300;
+  const MAX_SCALE = 5;      // 上限，避免超大页面撑爆内存
+  const baseScale = Math.max(1, Math.min(MAX_SCALE, TARGET_DPI / 72));
+  const pages = [];
+
+  for (let i = 1; i <= total; i++){
+    onProgress(i, total, "正在解析第 " + i + " / " + total + " 页");
+    // 只读页面几何信息（宽高比用于预留摆位），不渲染像素。
+    // getPage 只解析页面字典，代价很小；真正耗时的像素渲染被推迟了。
+    let dim = { w: 595, h: 842 };   // 拿不到几何信息时按 A4 比例兜底
+    try{
+      const page = await doc.getPage(i);
+      const base = page.getViewport({ scale: 1 });
+      dim = { w: Math.max(1, Math.round(base.width)), h: Math.max(1, Math.round(base.height)) };
+      try{ page.cleanup(); }catch(e){}
+    }catch(e){ /* 单页几何失败不致命，摆位先用兜底比例 */ }
+
+    pages.push({
+      file: "",             // 尚未渲染；渲染完成后由管理器填入 blob URL
+      pending: true,        // 占位标记，render() 据此画"渲染中"占位
+      label: "第 " + i + " 页",
+      w: dim.w, h: dim.h,
+      source: file.name + "#" + i,
+      _render: () => renderPdfPage(doc, i, baseScale),
+    });
+  }
+  // 文档对象随结果带回，开门后由 disposeBookRenderers 统一接管生命周期
+  pages.pdfDoc = doc;
+  return pages;
+}
+
+/**
+ * 渲染 PDF 的某一页为无损 PNG。
+ *
+ * 关键设计与整本渲染时代相同（防"翻到几十页后空白"）：
+ * 1. 不调用 page.getOperatorList()（内存杀手）；
+ * 2. canvas 用完尺寸归零，让浏览器回收；
+ * 3. page.cleanup() 释放 pdf.js 内部缓存。
+ * 现在每次只渲染一页，内存峰值比原来更低。
+ */
+async function renderPdfPage(doc, num, scale){
+  const page = await doc.getPage(num);
+  let viewport = page.getViewport({ scale });
+  // 超大页保护：单页像素超过 16MP（4096²）就整体降采样。
+  // 大部头扫描件（一两百页、300DPI）以前会按原尺寸逐页渲染，
+  // 一张画布就是几十 MB，页数一多内存吃紧甚至把渲染进程压垮，
+  // 表现成"页码在、内容全无"的静默空白。
+  const MAX_RENDER_PX = 4096 * 4096;
+  if (viewport.width * viewport.height > MAX_RENDER_PX){
+    const k = Math.sqrt(MAX_RENDER_PX / (viewport.width * viewport.height));
+    viewport = page.getViewport({ scale: scale * k });
+  }
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.max(1, Math.floor(viewport.width));
+  canvas.height = Math.max(1, Math.floor(viewport.height));
+
+  const ctx = canvas.getContext("2d", { alpha: false });
+  ctx.fillStyle = "#ffffff";
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  // 记录 canvas 尺寸，渲染后可能被 pdf.js 调整
+  const cw = canvas.width, ch = canvas.height;
+
+  try{
+    await page.render({ canvasContext: ctx, viewport }).promise;
+
+    // 输出格式按页面积挑：小页（≤4MP）用无损 PNG；
+    // 大页用 JPEG（扫描件本身就是有损源，q0.9 看不出差别，
+    // 体积只有 PNG 的十分之一上下）—— 124 页的书能省下大几百 MB 内存
+    const mp = (cw * ch) / 1e6;
+    const mime = mp > 4 ? "image/jpeg" : "image/png";
+    const blob = await new Promise((r) => {
+      try { canvas.toBlob(r, mime, mime === "image/jpeg" ? 0.9 : undefined); } catch(e){ r(null); }
+    });
+    if (blob && blob.size > 0){
+      return { url: URL.createObjectURL(blob), w: cw, h: ch };
+    }
+    return null;   // 渲染成功但没有产出，按失败处理
+  }finally{
+    // 及时释放：尺寸归零后浏览器才能回收显存与内存
+    canvas.width = 0;
+    canvas.height = 0;
+    try { page.cleanup(); } catch(e){}
+  }
+}
+
+/* ---------- 懒渲染管理器 ---------- */
+/**
+ * PDF 页面不再在导入时全部渲染，而是：
+ *   - 打开书时渲染当前那一页（importFiles 里 await）；
+ *   - 翻到某页时，若该页（及相邻页）未渲染，立即渲染；
+ *   - 其余页面由后台队列按顺序慢慢补齐，每页之间让出主线程。
+ *
+ * epoch 用于换书时让旧的后台循环自行退出，避免新旧两本书抢渲染。
+ */
+const RENDER = { docs: [], epoch: 0 };
+
+/** 换书时销毁旧书的 pdf.js 文档（keep 里的属于新书，保留） */
+function disposeBookRenderers(keep){
+  RENDER.epoch++;
+  const stale = keep ? RENDER.docs.filter((d) => !keep.includes(d)) : RENDER.docs.slice();
+  RENDER.docs = keep ? keep.slice() : [];
+  setTimeout(() => {
+    stale.forEach((d) => { try{ d.destroy(); }catch(e){} });
+  }, 0);
+}
+
+/** 渲染第 i 页（0 基）并就地更新 DOM。重复调用有 _rendering 守卫，安全 */
+async function ensurePageRendered(i){
+  const p = state.pages[i];
+  if (!p || !p.pending || !p._render || p._rendering) return;
+  p._rendering = true;
+  try{
+    const r = await p._render();
+    if (r){
+      // 渲染尺寸是等比缩放得来，比例一般不变；万一变了（换过渲染参数），
+      // 「跨」的划分要跟着重算，否则对开页可能被判成单页
+      const oldAR = (p.w && p.h) ? (p.w / p.h) : 0;
+      p.file = r.url; p.w = r.w; p.h = r.h;
+      if (oldAR && Math.abs((r.w / r.h) - oldAR) > 0.01) invalidateCrosses();
+      p.pending = false;
+      p._render = null;
+      paintPage(i);
+    }else{
+      throw new Error("没有产出图像");
+    }
+  }catch(err){
+    console.warn("第 " + (i + 1) + " 页渲染失败：", err);
+    p.pending = false;
+    p._failed = true;
+    p._render = null;
+    markPageFailed(i);
+    flash("第 " + (i + 1) + " 页渲染失败");
+  }finally{
+    p._rendering = false;
+  }
+}
+
+/** 一页渲染失败：占位转为"本页渲染失败"提示 */
+function markPageFailed(i){
+  const wrap = track.querySelector('.page[data-src="' + i + '"]');
+  if (!wrap) return;
+  const sheet = wrap.querySelector(".sheet");
+  if (sheet){
+    sheet.classList.remove("pending");
+    sheet.classList.add("failed");
+    const img = sheet.querySelector("img");
+    if (img) img.style.visibility = "hidden";
+  }
+}
+
+/** 一页渲染完成后，把它画进已经摆好的格子里（布局不变，只补图） */
+function paintPage(i){
+  const p = state.pages[i];
+  if (!p || !p.file) return;
+  const wrap = track.querySelector('.page[data-src="' + i + '"]');
+  if (wrap){
+    const sheet = wrap.querySelector(".sheet");
+    const img = sheet.querySelector("img");
+    if (sheet && img){
+      sheet.classList.remove("pending", "failed");
+      img.style.visibility = "";
+      img.src = pageUrl(p);
+    }
+  }
+  // 缩略图同步补上
+  const thumb = thumbStrip.querySelector('.t[data-src="' + i + '"] img');
+  if (thumb && !thumb.getAttribute("src")) thumb.src = pageUrl(p);
+}
+
+/** 当前页与相邻页要优先渲染（翻页时立即触发） */
+function requestPagesAround(idx){
+  const total = state.pages.length;
+  for (const i of [idx, idx + 1, idx - 1]){
+    const p = state.pages[i];
+    if (p && p.pending && !p._rendering){
+      ensurePageRendered(i).catch(() => {});
+    }
+  }
+}
+
+/** 后台按顺序把全书补齐。每页渲染完让出主线程，翻页请求可随时插队 */
+async function startBackgroundRender(){
+  const epoch = RENDER.epoch;
+  const total = state.pages.length;
+  for (let i = 0; i < total; i++){
+    const p = state.pages[i];
+    if (!p || !p.pending || p._rendering) continue;
+    await ensurePageRendered(i);
+    if (epoch !== RENDER.epoch) return;   // 已经换书，别再动旧的页面
+    // 让出主线程：给浏览器回收内存、响应用户操作的机会
+    await new Promise((r) => setTimeout(r, 0));
+  }
+  if (epoch === RENDER.epoch){
+    const failed = state.pages.filter((p) => p._failed).length;
+    if (!failed) flash("全书 " + total + " 页已全部就绪");
+  }
+}
+
+/* --- 把图片文件读成页面 --- */
+async function loadImages(files, onProgress){
+  const pages = [];
+  const sorted = files.slice().sort((a, b) =>
+    a.name.localeCompare(b.name, "zh-Hans-CN", { numeric: true, sensitivity: "base" })
+  );
+  for (let i = 0; i < sorted.length; i++){
+    const f = sorted[i];
+    onProgress(i + 1, sorted.length, "正在读取 " + f.name);
+    const url = URL.createObjectURL(f);   // 直接引用原文件，零重编码
+    const dim = await new Promise((res) => {
+      const im = new Image();
+      im.onload = () => res({ w: im.naturalWidth, h: im.naturalHeight });
+      im.onerror = () => res({ w: 0, h: 0 });
+      im.src = url;
+    });
+    pages.push({
+      file: url,
+      label: "第 " + (i + 1) + " 页",
+      w: dim.w, h: dim.h,
+      source: f.name,
+    });
+  }
+  return pages;
+}
+
+/* --- 入口：接收一批文件 ---
+   handles 可选：与 fileList 对应的 FileSystemFileHandle（走
+   showOpenFilePicker 时才有）。有句柄就存进 IndexedDB，
+   「最近打开」才能一键重开；拖放进来的文件拿不到句柄，照旧。 */
+async function importFiles(fileList, handles){
+  const files = Array.from(fileList || []);
+  if (!files.length) return;
+
+  const pdfs = files.filter((f) => /\.pdf$/i.test(f.name) || f.type === "application/pdf");
+  const imgs = files.filter((f) => f.type.startsWith("image/") || /\.(jpe?g|png|bmp|tiff?|webp|gif|jfif)$/i.test(f.name));
+
+  if (!pdfs.length && !imgs.length){
+    alert("没有识别到可用的文件。\n请拖入 PDF 或 JPG / PNG / TIFF 等图片。");
+    return;
+  }
+
+  $("empty").classList.remove("show");
+  setProgress("准备中…", 0, "");
+
+  try{
+    let pages = [];
+    let title = "未命名古籍";
+    const newDocs = [];   // 本书涉及的 pdf.js 文档，开门后替换掉上一本的
+
+    // 同一批里优先处理 PDF；若有多个 PDF，按文件名排序逐个追加
+    const ordered = pdfs.slice().sort((a, b) =>
+      a.name.localeCompare(b.name, "zh-Hans-CN", { numeric: true })
+    );
+
+    for (const pdf of ordered){
+      // 解析是秒级的：只读结构 + 几何尺寸，不渲染像素
+      const got = await loadPdf(pdf, (cur, tot, msg) => {
+        setProgress("解析 PDF：" + pdf.name, cur / tot, msg);
+      });
+      newDocs.push(got.pdfDoc);
+      pages = pages.concat(got);
+      if (ordered.length === 1 && !imgs.length){
+        title = pdf.name.replace(/\.pdf$/i, "");
+      }
+    }
+
+    if (imgs.length){
+      const got = await loadImages(imgs, (cur, tot, msg) => {
+        setProgress("读取图片", cur / tot, msg);
+      });
+      pages = pages.concat(got);
+      if (!ordered.length && imgs.length === 1){
+        title = imgs[0].name.replace(/\.[^.]+$/, "");
+      }
+    }
+
+    if (!pages.length) throw new Error("没有解析出任何页面");
+
+    // 重新编号，保证 label 连续
+    pages.forEach((p, i) => { p.label = "第 " + (i + 1) + " 页"; });
+
+    // 用户是从「最近打开」点进来、重新选了同一个文件的情况：
+    // 书名沿用记录里的，这样能续上同一条历史，而不是新增一条。
+    const resume = pendingResume;
+    pendingResume = null;
+    const bookId = resume
+      ? resume.id
+      : "file:" + title + ":" + pages.length;
+
+    // 有句柄就存下来：下次从「最近打开」点开，凭句柄直接重开，
+    // 不再要求重新选文件。重新选同一个文件续读时也会覆盖到同一个 bookId。
+    if (handles && handles.length){
+      const pairs = [];
+      for (const h of handles){
+        if (h && h.name) pairs.push({ name: h.name, handle: h });
+      }
+      if (pairs.length) saveBookHandles(bookId, pairs);
+    }
+
+    // 文件本体也存一份缓存：拖放进来的书没有句柄，靠它实现一键重开。
+    // Fire-and-forget：缓存写多慢都不该拖住开门。
+    cacheBookFiles(bookId, files);
+
+    // 续读目标页：先把"开门第一眼"的页面渲染好再展示，
+    // 通常一两秒；其余页面开门后由后台队列补齐。
+    const startIdx = resume ? Math.min(resume.page, pages.length) - 1 : 0;
+    const firstPage = pages[startIdx];
+    if (firstPage && firstPage.pending && firstPage._render){
+      setProgress("正在渲染第 " + (startIdx + 1) + " 页", 0.92, "");
+      try{
+        const r = await firstPage._render();
+        if (r){
+          firstPage.file = r.url; firstPage.w = r.w; firstPage.h = r.h;
+          firstPage.pending = false; firstPage._render = null;
+        }else{
+          firstPage.pending = false; firstPage._failed = true; firstPage._render = null;
+        }
+      }catch(e){
+        console.warn("首页渲染失败：", e);
+        firstPage.pending = false; firstPage._failed = true; firstPage._render = null;
+      }
+    }
+
+    applyManifest({
+      title: resume ? resume.name : title,
+      direction: state.dir,   // 沿用当前装帧方向
+      pageCount: pages.length,
+      pages: pages,
+    }, { bookId: bookId });
+
+    // 新书已就位：销毁上一本的 pdf.js 文档，epoch++ 让旧后台循环退出
+    disposeBookRenderers(newDocs);
+    // 其余页面按顺序在后台慢慢补齐，翻页请求随时插队
+    startBackgroundRender();
+
+    // 记录下来。本机文件没法在下次凭空读回，只留书名 / 页数 / 进度做书签。
+    rememberBook({
+      id: bookId,
+      name: state.title,
+      kind: "file",
+      total: pages.length,
+      page: resume ? Math.min(resume.page, pages.length) : 1,
+      dir: state.dir,
+      theme: state.theme,
+    });
+
+    // 预取下一页（已渲染的才预取；未渲染的由后台队列负责）
+    if (pages.length > 1 && !pages[1].pending) new Image().src = pageUrl(pages[1]);
+
+    // 续读：跳回上次看到的那一页
+    if (resume && resume.page > 1){
+      const target = Math.min(resume.page, pages.length) - 1;
+      requestAnimationFrame(() => goTo(target, false));
+      flash("已回到第 " + (target + 1) + " 页");
+    }
+
+    hideProgress();
+    flash("已载入 " + pages.length + " 页" +
+      (pages.some((p) => p.pending) ? "，其余页面正在后台渲染" : ""));
+  }catch(err){
+    hideProgress();
+    alert("载入失败：" + (err && err.message ? err.message : err));
+    if (!state.ready) $("empty").classList.add("show");
+  }
+}
+
+/* --- 文件选择 / 拖放 绑定 --- */
+const fileInput = $("fileInput");
+
+// 「打开文件」这条路上出过岔子的地方都记在这儿，方便排查（gushiReader.pickInfo()）
+let lastPickError = null;
+let pickerBlocked = false;   // 本会话里 picker 已经失败过，后面直接走 input
+
+/**
+ * showOpenFilePicker 并非到处可用，必须逐条判定：
+ *   1. 旧浏览器 / 局域网 http 访问（非安全上下文）根本没有这个 API；
+ *   2. 跨源 iframe（预览面板、被嵌进别的网页）里 Chrome 直接抛
+ *      SecurityError: Cross origin sub frames aren't allowed to show a file picker；
+ *   3. 页面被带 sandbox 的 iframe 包住时权限策略同样会拦。
+ * 这些环境一律走 <input type="file">——否则点了按钮毫无反应，像是"坏了"。
+ * 句柄只是顺带的好处（有文件本体缓存托底），丢掉不影响"最近打开"一键重开。
+ */
+function canUseFilePicker(){
+  if (pickerBlocked) return false;
+  if (typeof window.showOpenFilePicker !== "function") return false;
+  if (window.isSecureContext === false) return false;
+  try{
+    // 任何 iframe 里都不用：input 稳得多，句柄非必需
+    if (window.self !== window.top) return false;
+  }catch(e){
+    return false;   // 连 window.top 都读不到 = 跨源 iframe
+  }
+  return true;
+}
+
+/**
+ * 打开文件。
+ * 能用 File System Access API 就优先走 showOpenFilePicker：它给的不只是
+ * File，还有可持久化的 FileSystemFileHandle —— 存进 IndexedDB 后，
+ * 「最近打开」能凭句柄重读磁盘上的原文件（文件改过也能读最新的）。
+ * 任何其它情况都退回 <input type="file">。
+ */
+async function pickFiles(){
+  if (canUseFilePicker()){
+    let handles = null;
+    try{
+      handles = await window.showOpenFilePicker({
+        multiple: true,
+        types: [{
+          description: "PDF 或图片",
+          accept: {
+            "application/pdf": [".pdf"],
+            "image/jpeg": [".jpg", ".jpeg", ".jfif"],
+            "image/png": [".png"],
+            "image/bmp": [".bmp"],
+            "image/tiff": [".tif", ".tiff"],
+            "image/webp": [".webp"],
+            "image/gif": [".gif"],
+          },
+        }],
+      });
+    }catch(e){
+      // 用户主动取消：静默退出，别多事
+      if (e && e.name === "AbortError"){
+        lastPickError = null;
+        return;
+      }
+      // 其它失败（跨源 iframe / 权限策略 / 系统不支持…）：
+      // 记下原因并永久降级到 input，别让按钮变成"点不动的死键"
+      lastPickError = (e && e.name ? e.name + ": " : "") + (e && e.message ? e.message : String(e));
+      pickerBlocked = true;
+      handles = null;
+    }
+
+    if (handles && handles.length){
+      const files = [];
+      for (const h of handles){
+        try{ files.push(await h.getFile()); }
+        catch(e){ lastPickError = "getFile → " + (e && e.name ? e.name : e); }
+      }
+      if (files.length){ importFiles(files, handles); return; }
+      // 一个文件都没读出来：同样降级，别在这里闷掉
+      pickerBlocked = true;
+    }
+  }
+
+  fileInput.value = "";
+  fileInput.click();
+}
+$("btnOpen").addEventListener("click", pickFiles);
+$("btnOpen2").addEventListener("click", pickFiles);
+fileInput.addEventListener("change", () => importFiles(fileInput.files));
+
+// 拖放：整窗口接收
+// 判断依据优先看 types 是否含 "Files"；某些环境（含自动化测试）types 为空，
+// 此时只要 dataTransfer 存在就认为是拖拽，避免漏判。
+function isFileDrag(e){
+  const dt = e.dataTransfer;
+  if (!dt) return false;
+  const types = dt.types ? Array.from(dt.types) : [];
+  if (types.length === 0) return true;
+  return types.includes("Files");
+}
+
+let dragDepth = 0;
+const dz = $("dropzone");
+window.addEventListener("dragenter", (e) => {
+  if (!isFileDrag(e)) return;
+  e.preventDefault();
+  dragDepth++;
+  dz.classList.add("on");
+});
+window.addEventListener("dragover", (e) => {
+  if (!isFileDrag(e)) return;
+  e.preventDefault();
+  if (e.dataTransfer) e.dataTransfer.dropEffect = "copy";
+});
+window.addEventListener("dragleave", (e) => {
+  dragDepth = Math.max(0, dragDepth - 1);
+  if (dragDepth === 0) dz.classList.remove("on");
+});
+window.addEventListener("drop", (e) => {
+  e.preventDefault();
+  dragDepth = 0;
+  dz.classList.remove("on");
+  if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files.length){
+    importFiles(e.dataTransfer.files);
+  }
+});
+
+/* ---------- 事件绑定 ---------- */
+
+// 左右按钮
+btnPrev.addEventListener("click", prev);
+btnNext.addEventListener("click", next);
+
+// 键盘
+window.addEventListener("keydown", (e) => {
+  if (overlay.classList.contains("open")){
+    if (e.key === "Escape"){ closeGo(); e.preventDefault(); }
+    if (e.key === "Enter"){ doGo(); e.preventDefault(); }
+    return;
+  }
+  if (e.target && e.target.tagName === "INPUT") return;
+
+  // 面板打开时，Esc 优先关面板
+  if (e.key === "Escape" && $("themePanel").classList.contains("open")){
+    closeThemePanel(); e.preventDefault(); return;
+  }
+  if (e.key === "Escape" && $("histPanel").classList.contains("open")){
+    closeHistPanel(); e.preventDefault(); return;
+  }
+
+  switch(e.key){
+    // 左右方向键固定语义，与装帧方向无关：
+    //   ← 上一页（页码变小）   → 下一页（页码变大）
+    // 装帧方向只影响页面在屏幕上的滑动方向，不该影响按键含义。
+    case "ArrowLeft": case "a": case "A":
+      prev(); e.preventDefault(); break;
+    case "ArrowRight": case "d": case "D":
+      next(); e.preventDefault(); break;
+    case " ": case "PageDown":
+      next(); e.preventDefault(); break;
+    case "Backspace": case "PageUp":
+      prev(); e.preventDefault(); break;
+    case "Home": goTo(0); e.preventDefault(); break;
+    case "End": goTo(state.pages.length - 1); e.preventDefault(); break;
+    case "+": case "=": zoomBy(1.25); e.preventDefault(); break;
+    case "-": case "_": zoomBy(0.8); e.preventDefault(); break;
+    case "0": resetFit(); e.preventDefault(); break;
+    case "f": case "F": toggleFull(); e.preventDefault(); break;
+    case "g": case "G": openGo(); e.preventDefault(); break;
+    case "o": case "O": pickFiles(); e.preventDefault(); break;
+    // 循环切换阅读底色
+    case "t": case "T": cycleTheme(); e.preventDefault(); break;
+    // 最近打开
+    case "h": case "H": toggleHistPanel(); e.preventDefault(); break;
+    // 聚焦：关 → 一页 → 两页 循环
+    case "x": case "X": cycleFocusMode(); e.preventDefault(); break;
+    // 翻书模式：对开显示 + 翻页动画
+    case "b": case "B": toggleViewMode(); e.preventDefault(); break;
+  }
+});
+
+// 鼠标滚轮翻页（未缩放时）。
+// 未缩放：向下滚 = 下一页。
+// 缩放后交还给容器的原生滚动 —— 容器已被镜像，滚轮方向自动符合右开本，
+// 这里不要再插手，否则会跟原生滚动打架。
+let wheelLock = 0;
+stage.addEventListener("wheel", (e) => {
+  if (isZoomed()) return;
+  const now = Date.now();
+  if (now - wheelLock < 420) return;
+  const d = Math.abs(e.deltaY) > Math.abs(e.deltaX) ? e.deltaY : e.deltaX;
+  if (Math.abs(d) < 6) return;
+  wheelLock = now;
+  d > 0 ? next() : prev();
+}, { passive:true });
+
+// 滚动时同步页码：用户拖动滚动条/滚轮滑动后，页码与滑块要跟上。
+// 用 rAF 节流，避免高频 scroll 事件里反复查 DOM。
+let scrollRaf = 0;
+stage.addEventListener("scroll", () => {
+  if (!isZoomed() || !state.ready) return;
+  if (scrollRaf) return;
+  scrollRaf = requestAnimationFrame(() => {
+    scrollRaf = 0;
+    const p = pageAtScroll();
+    if (p !== state.idx){
+      state.idx = p;
+      updateChrome();
+      markThumb();
+    }
+  });
+}, { passive:true });
+
+/* ------------------------------------------------------------------
+   布局变了就重新归位（安全网）
+
+   轨道宽度原来是靠 <img> 撑出来的。只要有一张图片晚到，整条轨道的宽度
+   就会变，之前算好的滚动位置立刻失效。实测过的坏情况：
+     图片未加载时 maxScroll = 0，图片到齐后 maxScroll = 2776，
+   而 scrollLeft 还停在 0 —— 右开本的第 1 页在最右端，于是被整个挤出
+   视野右侧，滑块停在半路，用户得自己去把滚动条拖到最右边才看得到第 1 页。
+
+   render() / applyScale() 现在已按原始宽高比预留纸面宽度，正常情况下
+   根本不会出现这种漂移；这里再兜一层：只要轨道宽度变了，就把当前页
+   重新贴回它该在的位置。用户自己滚过之后就不再插手，尊重他找好的位置。
+   ------------------------------------------------------------------ */
+let lastTrackW = -1;
+let userOwnsScroll = false;
+function userTakesScroll(){ userOwnsScroll = true; }
+
+const reflowGuard = new ResizeObserver(() => {
+  if (!state.ready || drag.active) return;   // 正在手抓拖动时别跟用户抢位置
+  const w = track.scrollWidth;
+  if (w === lastTrackW) return;
+  lastTrackW = w;
+
+  if (isZoomed()){
+    if (userOwnsScroll) return;              // 用户已经自己找好位置了
+    const target = scrollLeftForPage(state.idx);
+    if (Math.abs(target - stage.scrollLeft) < 2) return;
+    stage.scrollLeft = target;               // 直接归位，不做动画
+  } else {
+    // 居中模式没有滚动条可对，重新把当前页摆正即可
+    alignToCurrent(false);
+  }
+});
+reflowGuard.observe(track);
+
+// 滚轮 / 按住拖动都算"用户接管了滚动位置"
+stage.addEventListener("wheel", userTakesScroll, { passive:true });
+stage.addEventListener("pointerdown", userTakesScroll, { passive:true });
+
+// 手抓拖动：鼠标 / 触屏 / 触控笔统一走 Pointer Events。
+// 未缩放时它是"拖动翻页"，缩放后它是"拖动画布"。详见 drag 注释块。
+stage.addEventListener("pointerdown", beginDrag);
+stage.addEventListener("pointermove", moveDrag);
+stage.addEventListener("pointerup", (e) => endDrag(e, false));
+stage.addEventListener("pointercancel", (e) => endDrag(e, true));
+// 触屏上还需阻止拖动时页面跟着滚，否则和我们的平移打架
+stage.addEventListener("touchmove", (e) => {
+  if (drag.active && drag.axis === "x") e.preventDefault();
+}, { passive:false });
+
+// 点击阅读区左右半屏：左半屏上一页，右半屏下一页（与按钮一致）
+stage.addEventListener("click", (e) => {
+  if (e.target.closest(".nav")) return;
+  // 刚做完拖动的手势不要再当成点击，否则拖完会顺带翻一页
+  if (drag.justDragged){ drag.justDragged = false; return; }
+  if (isZoomed()) return;
+  const r = stage.getBoundingClientRect();
+  const x = e.clientX - r.left;
+  if (x < r.width * 0.28) prev();
+  else if (x > r.width * 0.72) next();
+});
+
+// 进度条
+slider.addEventListener("input", () => goTo(parseInt(slider.value, 10), false));
+
+// 缩放
+function zoomBy(f){
+  // 翻书模式整张按适应高度摆纸，没有缩放语义
+  if (bookMode()){ flash("翻书模式不支持缩放，按 B 切回连续模式"); return; }
+  state.zoom = Math.min(6, Math.max(0.25, state.zoom * f));
+  applyScale();
+}
+function resetFit(){
+  if (bookMode()){ flash("翻书模式本身就是适应高度，按 B 切回连续模式"); return; }
+  state.zoom = 1;
+  computeFitHeight();
+  applyScale();
+}
+$("btnIn").addEventListener("click", () => zoomBy(1.25));
+$("btnOut").addEventListener("click", () => zoomBy(0.8));
+$("btnFit").addEventListener("click", resetFit);
+
+// 方向
+dirRTL.addEventListener("click", () => {
+  state.userPickedDir = true;
+  setDirection("right-to-left");
+});
+dirLTR.addEventListener("click", () => {
+  state.userPickedDir = true;
+  setDirection("left-to-right");
+});
+
+// 缩略图
+$("btnThumbs").addEventListener("click", () => {
+  thumbs.classList.toggle("open");
+  markThumb();
+});
+
+// 全屏
+function toggleFull(){
+  if (!document.fullscreenElement) document.documentElement.requestFullscreen?.();
+  else document.exitFullscreen?.();
+}
+$("btnFull").addEventListener("click", toggleFull);
+
+// 跳转弹层
+function openGo(){
+  $("goMax").textContent = String(state.pages.length);
+  goInput.value = String(state.idx + 1);
+  overlay.classList.add("open");
+  setTimeout(() => { goInput.focus(); goInput.select(); }, 30);
+}
+function closeGo(){ overlay.classList.remove("open"); }
+function doGo(){
+  const v = parseInt(goInput.value, 10);
+  if (Number.isFinite(v)) goTo(v - 1);
+  closeGo();
+}
+$("btnGo").addEventListener("click", openGo);
+$("goOk").addEventListener("click", doGo);
+$("goCancel").addEventListener("click", closeGo);
+overlay.addEventListener("click", (e) => { if (e.target === overlay) closeGo(); });
+
+// 阅读底色
+$("btnTheme").addEventListener("click", (e) => {
+  e.stopPropagation();          // 否则立刻被下面的"点击外部关闭"收走
+  closeHistPanel();             // 两个面板不同时开，免得叠在一起
+  toggleThemePanel();
+});
+
+// 聚焦（一页 / 两页）
+$("btnFocus").addEventListener("click", clickFocus1);
+$("btnFocus2").addEventListener("click", clickFocus2);
+
+// 翻书模式
+$("btnView").addEventListener("click", toggleViewMode);
+
+// 最近打开
+$("btnHist").addEventListener("click", (e) => {
+  e.stopPropagation();
+  toggleHistPanel();
+});
+$("histClear").addEventListener("click", (e) => {
+  e.stopPropagation();
+  if (confirm("清空全部「最近打开」记录？\n（只清记录，不会删除任何书籍文件）")) clearHistory();
+});
+
+// 点击面板外部关闭（底色与最近打开共用一个判定）
+document.addEventListener("click", (e) => {
+  const tp = $("themePanel"), hp = $("histPanel");
+  if (tp.classList.contains("open") && !tp.contains(e.target) && !e.target.closest("#btnTheme")){
+    closeThemePanel();
+  }
+  if (hp.classList.contains("open") && !hp.contains(e.target) && !e.target.closest("#btnHist")){
+    closeHistPanel();
+  }
+});
+
+// 用户在「请重新选择文件」状态下直接关掉文件对话框：还原空状态文案，
+// 不要把提示永久留在"请重新选择"上。
+window.addEventListener("focus", () => {
+  setTimeout(() => {
+    if (!pendingResume || state.ready) return;
+    const box = $("empty").querySelector(".box");
+    if (!box) return;
+    box.querySelector("h2").textContent = "把你的古籍拖进来";
+    box.querySelector("p").innerHTML =
+      "直接把 <b>PDF</b> 或页面图片拖到窗口任意位置即可开始阅读。";
+  }, 300);
+});
+
+// 窗口尺寸变化
+let rt = 0;
+window.addEventListener("resize", () => {
+  clearTimeout(rt);
+  rt = setTimeout(() => {
+    if (!state.ready) return;
+    // 翻书模式：纸张尺寸跟着窗口走
+    if (state.view === "book"){ layoutBook(); return; }
+    if (!isZoomed()){
+      computeFitHeight();
+      applyScale();
+    } else {
+      // 缩放模式：窗口变了，滚动范围也变了，重新把当前页拉回视野
+      scrollCurrentIntoView(false);
+    }
+  }, 140);
+});
+
+// 供自动化测试与外部脚本调用的极小接口。
+// 只暴露跳页、状态快照和主题切换，不暴露内部实现细节。
+window.goTo = goTo;
+window.gushiReader = {
+  state: () => ({
+    idx: state.idx, total: state.pages.length,
+    title: state.title,
+    dir: state.dir, theme: state.theme, zoom: state.zoom,
+    focus: state.focus,
+    focusScope: state.focusScope,
+    view: state.view,
+    flipping: flipBusy,
+    zoomed: isZoomed(),
+    scrollLeft: Math.round(stage.scrollLeft),
+    maxScroll: Math.round(maxScrollLeft()),
+    bookId: state.bookId,
+    history: readHistory().length,
+    // PDF 懒渲染：还没渲染出图的页数（0 = 全书就绪）
+    pendingPages: state.pages.filter((p) => p.pending).length,
+    failedPages: state.pages.filter((p) => p._failed).length,
+    // 拖动状态，供自动化断言"抓取中"的视觉反馈确实生效
+    dragging: drag.active,
+    dragAxis: drag.axis,
+  }),
+  setTheme: applyTheme,
+  setFocus: setFocusMode,
+  setFocusScope,
+  setDirection,
+  // 视图模式：setView("book") 进翻书、setView("scroll") 回连续轨道
+  setView: setViewMode,
+  // 翻书布局自检：当前「跨」的摆位（含左右两张纸各自的位置与页号），供自动化断言
+  bookInfo: () => {
+    if (!state.pages.length) return null;
+    const area = $("bookArea");
+    const W = area.clientWidth || stage.clientWidth || 1;
+    const baseH = Math.max(200, stage.clientHeight - 84);
+    const cs = crosses();
+    const k = crossIndexAt(state.idx);
+    const cross = cs[k];
+    const plan = planCross(cross, W, baseH);
+    const pick = (slot) => {
+      const it = plan.items.filter((x) => x.slot === slot)[0];
+      return it ? { idx: it.idx, left: it.left, w: it.w } : null;
+    };
+    return {
+      index: state.idx, total: state.pages.length,
+      cross: k, crossCount: cs.length, crossKind: cross.kind, crossPages: cross.pages.slice(),
+      kind: cross.kind,
+      left: pick("L"), right: pick("R"), full: pick("F"),
+      // 兼容旧断言：整张跨报 full，落单页按它所在的半侧报
+      half: pick("F") ? "full" : (pick("R") ? "right" : "left"),
+      h: Math.round(plan.H),
+      spineX: Math.round(W / 2), rtl: bookRTL(),
+      pending: cross.pages.some((i) => state.pages[i].pending),
+    };
+  },
+  // PDF 解析库自检：库从哪来的（本地 / CDN）、worker 指向哪儿
+  pdfInfo: () => ({
+    loaded: !!window.pdfjsLib,
+    source: pdfjsSource,
+    worker: window.pdfjsLib ? window.pdfjsLib.GlobalWorkerOptions.workerSrc : "",
+    localFile: PDFJS_LOCAL,
+  }),
+  // 打开文件的通道自检：走的哪条路、有没有失败过、失败原因是什么
+  pickInfo: () => ({
+    mode: canUseFilePicker() ? "picker" : "input",
+    blocked: pickerBlocked,
+    hasApi: typeof window.showOpenFilePicker === "function",
+    secure: window.isSecureContext === true,
+    inIframe: (() => { try{ return window.self !== window.top; }catch(e){ return true; } })(),
+    lastError: lastPickError,
+  }),
+  history: () => readHistory(),
+  clearHistory,
+  // 强制渲染某一页（0 基），供自动化测试与调试
+  renderPage: (i) => ensurePageRendered(i),
+  // 内部状态全亮出来：真机上出"页码在、内容无"这类静默故障时，
+  // 让用户把 diag 结果发过来就能定位，不用猜
+  diag: () => {
+    let bookDisplay = "?", areaW = 0, areaH = 0;
+    try{
+      bookDisplay = getComputedStyle($("book")).display;
+      const r = $("bookArea").getBoundingClientRect();
+      areaW = Math.round(r.width); areaH = Math.round(r.height);
+    }catch(e){}
+    const leaves = ["bookL", "bookR", "bookFull"].map((id) => {
+      const el = $(id);
+      const im = el.querySelector("img");
+      return { id, display: el.style.display,
+               hasSrc: !!(im && im.getAttribute("src")),
+               nw: im ? im.naturalWidth : -1 };
+    });
+    return {
+      view: state.view,
+      datasetView: document.body.dataset.view,
+      ready: state.ready,
+      pages: state.pages.length,
+      bookDisplay, areaW, areaH, leaves,
+      trackPages: track.children.length,
+      pendingPages: state.pages.filter((p) => p.pending).length,
+      failedPages: state.pages.filter((p) => p._failed).length,
+      // 入口与存储：判断「记录变空了」到底是书的问题还是打开方式的问题
+      env: {
+        origin: ENV.origin, protocol: ENV.protocol, file: ENV.file,
+        secure: ENV.secure, picker: ENV.picker,
+        lsOK: ENV.lsOK, idbOK: ENV.idbOK,
+        persisted: ENV.persisted, usageMB: ENV.usageMB, quotaMB: ENV.quotaMB,
+      },
+      errors: DIAG.errors.slice(),
+      heals: DIAG.heals.slice(),
+    };
+  },
+  // 环境自检结果（入口地址 / 存储可持久性）
+  env: () => Object.assign({}, ENV),
+};
+
+/* ===================================================================
+   自愈看门狗 + 错误可见化
+   真机上出现过「页码在、内容全无」而本地各种环境都复现不了的静默
+   故障（预览面板渲染进程异常、大部头扫描件内存吃紧、未知 JS 错误
+   都会这样表现）。三道保险：
+     1) 未捕获的错误 / Promise 拒绝弹一条右上角小浮层，不再无声吞掉；
+     2) 每秒多体检一次：该显示却空着的视图就地修复（重摆 / 重建）；
+     3) gushiReader.diag() 把内部状态和自愈记录亮出来，便于远程定位。
+   =================================================================== */
+const DIAG = { errors: [], heals: [] };
+
+let errToastTimer = 0;
+function showErrToast(msg){
+  const el = $("errToast");
+  el.textContent = msg;
+  el.classList.add("show");
+  clearTimeout(errToastTimer);
+  errToastTimer = setTimeout(() => el.classList.remove("show"), 8000);
+}
+$("errToast").addEventListener("click", () => {
+  clearTimeout(errToastTimer);
+  $("errToast").classList.remove("show");
+});
+
+function recordErr(msg){
+  const line = String(msg || "未知错误").slice(0, 160);
+  DIAG.errors.push(line);
+  if (DIAG.errors.length > 20) DIAG.errors.shift();
+  showErrToast("内部错误（不影响翻页可继续阅读）：" + line);
+}
+window.addEventListener("error", (e) => recordErr(e.message));
+window.addEventListener("unhandledrejection", (e) => {
+  const r = e.reason;
+  recordErr(r && (r.message || String(r)) || "未处理的 Promise 拒绝");
+});
+
+function heal(msg, detail){
+  // detail 进诊断记录（供 gushiReader.diag() 取证），弹窗只显示人话
+  DIAG.heals.push(detail ? msg + "【" + detail + "】" : msg);
+  if (DIAG.heals.length > 20) DIAG.heals.shift();
+  flash(msg);
+}
+
+// 翻书缺页要连续两轮体检都成立才动手：单次瞬态（渲染间隙、被节流的一帧）
+// 不值得弹窗打扰；真空白 2.4 秒内也会被修好
+let bookMissStreak = 0, bookMissWhy = "";
+
+function watchdogTick(){
+  if (!state.ready || !state.pages.length) return;
+  // 导入 / 跳页的过程中先别插手
+  if ($("loading").classList.contains("show")) return;
+  const dv = document.body.dataset.view;
+  if (dv !== state.view){
+    // 状态与 DOM 属性漂移（扩展或外部脚本改过 DOM 之类）：拉回来
+    document.body.dataset.view = state.view;
+    heal("视图属性与状态不一致，已重置");
+  }
+  if (state.view === "book"){
+    const area = $("bookArea");
+    const r = area.getBoundingClientRect();
+    // 当前跨该有的每张纸都要在位，且已渲染的页不能是空图
+    const cross = crosses()[crossIndexAt(state.idx)];
+    const plan = planCross(cross, Math.max(320, stage.clientWidth), Math.max(200, stage.clientHeight - 84));
+    let why = "";
+    const missing = plan.items.some((it) => {
+      const el = $(it.slot === "F" ? "bookFull" : (it.slot === "L" ? "bookL" : "bookR"));
+      if (el.style.display === "none" || el._leafIdx !== it.idx){
+        why = "第 " + (it.idx + 1) + " 页没摆进槽位 " + it.slot;
+        return true;
+      }
+      const p = state.pages[it.idx];
+      if (p.pending || p._failed) return false;
+      const im = el.querySelector("img");
+      if (!(im && im.getAttribute("src"))){ why = "第 " + (it.idx + 1) + " 页的纸上没有图"; return true; }
+      return false;
+    });
+    if ((r.width < 10 || r.height < 10 || missing) && !flipBusy){
+      bookMissStreak++;
+      bookMissWhy = (r.width < 10 || r.height < 10)
+        ? "区域尺寸塌成 " + Math.round(r.width) + "x" + Math.round(r.height)
+        : why + "（读到第 " + (state.idx + 1) + " 页，跨型 " + cross.kind + "）";
+      if (bookMissStreak >= 2){
+        bookMissStreak = 0;
+        layoutBook();
+        heal("翻书视图缺页，已自动重摆", bookMissWhy);
+      }
+    } else {
+      bookMissStreak = 0;
+    }
+  } else if (!track.children.length && !$("empty").classList.contains("show")){
+    render();
+    alignToCurrent(false);
+    heal("连续视图页面丢失，已自动重建");
+  }
+}
+setInterval(() => { try{ watchdogTick(); }catch(e){ /* 看门狗自己不能成新故障源 */ } }, 1200);
+
+/* ===================================================================
+   环境自检：入口地址与存储可持久性
+   ---------------------------------------------------------------
+   反复出现「这次调好了，下次打开又不行」，根子不在阅读器，在**入口**：
+   浏览器把每个地址当成不同的网站，各存一份数据 ——
+     http://127.0.0.1:8899   ≠   http://localhost:8899   ≠   file:///…
+   三种打开方式各有一套「最近打开」「阅读位置」「设置」，互不可见；
+   更隐秘的是，整本书的离线缓存属 best-effort 存储，浏览器在磁盘吃紧
+   或清理数据时会静默回收，表现就是「上次一键打开，这次又要重新导入」。
+   这里做三件事：申请持久存储、入口不对时说清楚、信息挂进 diag()。
+   =================================================================== */
+const ENV = {
+  origin: "", protocol: "", file: false, secure: false,
+  lsOK: true, idbOK: true, picker: false,
+  persisted: null, usageMB: 0, quotaMB: 0,
+};
+const ENV_DISMISS_KEY = "gushi-reader-envbar-dismissed";
+
+function showEnvBar(html){
+  const el = $("envBar");
+  if (!el) return;
+  el.innerHTML = html + '<span class="x" title="知道了，不再提示">×</span>';
+  el.classList.add("show");
+}
+$("envBar").addEventListener("click", (e) => {
+  if (!e.target.classList || !e.target.classList.contains("x")) return;
+  $("envBar").classList.remove("show");
+  try{ localStorage.setItem(ENV_DISMISS_KEY, "1"); }catch(err){}
+});
+
+/** 双击直开又读不到库清单时，把「该怎么做」直接写出来，不留空白页 */
+function adviceForFileMode(){
+  if (!ENV.file) return;
+  showEnvBar("<b>没能读到书库清单</b>（file:// 下浏览器禁止网页读取本地文件）。" +
+    "请双击书库文件夹里的 <b>启动右翻书.bat</b> 打开阅读器；" +
+    "或直接把 PDF／图片拖进本页面，一样可以读。");
+}
+
+/** 根据自检结果给出一次性建议（用户点 × 后不再打扰） */
+function envAdvise(){
+  let dismissed = false;
+  try{ dismissed = localStorage.getItem(ENV_DISMISS_KEY) === "1"; }catch(e){}
+  if (dismissed) return;
+  if (ENV.file){
+    showEnvBar("<b>当前是「双击文件」打开的阅读器（file://）。</b>" +
+      "功能都能用，但阅读记录与离线缓存存在这个地址下，" +
+      "换成别的方式打开就看不到它们。想每次都稳稳当当：" +
+      "关掉本页，双击书库文件夹里的 <b>启动右翻书.bat</b>，" +
+      "它固定用 <b>http://127.0.0.1:8899</b> 打开。");
+    return;
+  }
+  if (ENV.persisted === false && ENV.usageMB >= 8){
+    // 只在「真的缓存了整本书」时才提醒：此时数据被回收的代价最大。
+    // 注意：Chrome 是否批准持久存储由它自己决定（看站点活跃度），
+    // 所以这里说明的是事实与后果，不是逐次必现的告警。
+    showEnvBar("<b>浏览器尚未把本站数据登记为「不会被自动清理」</b>" +
+      "（已缓存约 " + ENV.usageMB + "MB 书页）。磁盘吃紧或清理浏览数据时，" +
+      "这些离线缓存可能被系统回收，表现是「最近打开」里的书要重新选一次文件。" +
+      "想更稳妥：在浏览器「设置 → 网站设置」里为本站允许持久存储，" +
+      "或关掉本提示（点右侧 ×），需要时重新导入一次即可。");
+    return;
+  }
+  if (!ENV.lsOK || !ENV.idbOK){
+    showEnvBar("<b>浏览器限制或不支持本地存储</b>，" +
+      "「最近打开」与阅读进度无法保存（可能开了无痕模式）。" +
+      "去掉无痕模式，或用 <b>启动右翻书.bat</b> 打开即可。");
+  }
+}
+
+async function initEnv(){
+  ENV.origin = location.origin === "null" ? "file://" : location.origin;
+  ENV.protocol = location.protocol;
+  ENV.file = location.protocol === "file:";
+  ENV.secure = window.isSecureContext === true;
+  ENV.picker = typeof window.showOpenFilePicker === "function";
+  try{
+    localStorage.setItem("gushi-ls-probe", "1");
+    localStorage.removeItem("gushi-ls-probe");
+    ENV.lsOK = true;
+  }catch(e){ ENV.lsOK = false; }
+  try{ ENV.idbOK = !!window.indexedDB; }catch(e){ ENV.idbOK = false; }
+
+  // 主动申请「持久存储」：Chrome 下不弹窗，批准后本站数据不再被自动回收。
+  // 整本 PDF 的离线缓存就存在这里，这一句能少掉一大批「最近打开失效」。
+  try{
+    if (navigator.storage && navigator.storage.persist){
+      ENV.persisted = await navigator.storage.persisted();
+      if (!ENV.persisted) ENV.persisted = await navigator.storage.persist();
+    }
+  }catch(e){ ENV.persisted = null; }
+  try{
+    if (navigator.storage && navigator.storage.estimate){
+      const est = await navigator.storage.estimate();
+      ENV.usageMB = Math.round((est.usage || 0) / 1048576);
+      ENV.quotaMB = Math.round((est.quota || 0) / 1048576);
+    }
+  }catch(e){}
+  try{ envAdvise(); }catch(e){}
+}
+
+// 启动
+boot();
+</script>
+</body>
+</html>
