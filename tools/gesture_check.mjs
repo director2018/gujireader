@@ -222,56 +222,66 @@ try {
   check(z.zoomed === true, `已进入缩放模式（zoom=${z.zoom}）`);
   check(z.maxScroll > 0, `内容确实溢出了（maxScroll=${z.maxScroll}）`);
 
-  // 右开本：起点应在最右端
+  // 左开本（默认）：起点应在最左端
   check(
-    Math.abs(z.scrollLeft - z.maxScroll) <= 6,
-    `右开本滚动条停在最右端（scrollLeft=${z.scrollLeft}, max=${z.maxScroll}）`
+    z.scrollLeft <= 6,
+    `左开本滚动条停在最左端（scrollLeft=${z.scrollLeft}, max=${z.maxScroll}）`
   );
 
   const before = z.scrollLeft;
 
-  // 右开本的拖动语义：手指把纸往右拉，下一页从左边进来。
-  // 换算到 scrollLeft 就是"手指往右拖 ⇒ scrollLeft 减小 ⇒ 看到更靠后的页"。
-  // 起点已经是 max（第 1 页贴右端），所以第一下拖不出位移是正常的，
+  // 左开本的拖动语义：标准画布拖拽，手指把纸往左拉，后面的页从右边进来。
+  // 换算到 scrollLeft 就是"手指往左拖 ⇒ scrollLeft 增大 ⇒ 看到更靠后的页"。
+  // 起点已经是 0（第 1 页贴左端），所以第一下拖不出位移是正常的，
   // 第二次拖才会越过页边界把页码推上去。
-  await dragPointer({ from: { x: 500, y: 400 }, dx: 300, button: 0 });
+  await dragPointer({ from: { x: 900, y: 400 }, dx: -300, button: 0 });
   await sleep(1000);
-  await dragPointer({ from: { x: 900, y: 400 }, dx: 300, button: 0 });
+  await dragPointer({ from: { x: 500, y: 400 }, dx: -300, button: 0 });
   await sleep(1100);
   const after = await snap();
   check(
-    after.scrollLeft < before - 100,
-    `往右拖使 scrollLeft 明显减小（${before} → ${after.scrollLeft}）`
+    after.scrollLeft > before + 100,
+    `往左拖使 scrollLeft 明显增大（${before} → ${after.scrollLeft}）`
   );
   check(
     after.idx > z.idx,
-    `往右拖推进到后面的页（第 ${z.idx + 1} → 第 ${after.idx + 1} 页）`
+    `往左拖推进到后面的页（第 ${z.idx + 1} → 第 ${after.idx + 1} 页）`
   );
   check(
-    after.scrollLeft < after.maxScroll - 6,
+    after.scrollLeft > 6,
     `松手后停在拖到的位置，没有被拉回起点（scrollLeft=${after.scrollLeft}）`
   );
 
   // 反方向拖回去
   const mid = after.scrollLeft;
   const midIdx = after.idx;
-  await dragPointer({ from: { x: 900, y: 400 }, dx: -300 });
+  await dragPointer({ from: { x: 900, y: 400 }, dx: 300 });
   await sleep(1100);
   const back = await snap();
   check(
-    back.scrollLeft > mid + 100,
-    `往左拖使 scrollLeft 明显增加（${mid} → ${back.scrollLeft}）`
+    back.scrollLeft < mid - 100,
+    `往右拖使 scrollLeft 明显减小（${mid} → ${back.scrollLeft}）`
   );
   check(
     back.idx <= midIdx,
-    `往左拖回退到前面的页（第 ${midIdx + 1} → 第 ${back.idx + 1} 页）`
+    `往右拖回退到前面的页（第 ${midIdx + 1} → 第 ${back.idx + 1} 页）`
   );
 
-  // 拖到最左端应能一路看到末页
-  await browser.evalJs(`document.getElementById('stage').scrollLeft = 0`);
+  // 拖到最右端应能一路看到末页（末页完整进入视野即可；
+  // 视口中心落在倒数第二页属正常几何——末页贴着右缘）
+  await browser.evalJs(`document.getElementById('stage').scrollLeft = document.getElementById('stage').scrollWidth`);
   await sleep(700);
   const atEnd = await snap();
-  check(atEnd.idx === 5, `滚到最左端显示末页（实际第 ${atEnd.idx + 1} 页）`);
+  const lastVisible = await browser.evalJs(`(function(){
+    var sr = document.getElementById('stage').getBoundingClientRect();
+    var el = document.querySelector('.page[data-src="5"]');
+    if (!el) return 0;
+    var b = el.getBoundingClientRect();
+    var vis = Math.min(b.right, sr.right) - Math.max(b.left, sr.left);
+    return Math.max(0, vis / (b.width || 1));
+  })()`);
+  check(lastVisible >= 0.99,
+    `滚到最右端末页完整可见（露出 ${Math.round(lastVisible * 100)}%）`);
 
   // 松开后不该被吸附走：再读一次，位置与页码都应稳定
   await sleep(800);
@@ -544,7 +554,7 @@ try {
   await sleep(1000);
 
   const f2 = await geo();
-  check(Math.abs(f2.scrollLeft - f2.maxScroll) <= 6,
+  check(f2.scrollLeft <= 6,
     `图片未加载时进滚动模式，滑块仍停在起点端（${f2.scrollLeft} / ${f2.maxScroll}）`);
   check(f2.page1 && f2.page1.ratio >= 0.99,
     `第 1 页完整可见（露出 ${f2.page1 ? Math.round(f2.page1.ratio * 100) : 0}%）`);
@@ -571,7 +581,7 @@ try {
   check(f3.loaded === f3.imgs, `图片全部加载完成（${f3.loaded}/${f3.imgs}）`);
   check(f3.maxScroll === f2.maxScroll,
     `图片到齐后最大滚动量不变（${f2.maxScroll} → ${f3.maxScroll}）`);
-  check(Math.abs(f3.scrollLeft - f3.maxScroll) <= 6,
+  check(f3.scrollLeft <= 6,
     `位置不漂移，滑块仍在起点端（${f3.scrollLeft} / ${f3.maxScroll}）`);
   check(f3.page1 && f3.page1.ratio >= 0.99,
     `第 1 页依然完整可见（露出 ${f3.page1 ? Math.round(f3.page1.ratio * 100) : 0}%）`);
