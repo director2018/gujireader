@@ -254,10 +254,10 @@ def write_manifest(
 
     页序在这里处理：`readingOrder` 给出阅读器应当依次渲染的页面索引。
 
-    * right-to-left（右开本，默认）
-        order = 逆序。第 1 页排在数组末尾 -> 落在最右侧，翻页时页面自右向左推进。
-    * left-to-right（现代左开本）
+    * left-to-right（现代左开本，默认：向右翻）
         order = 正序。
+    * right-to-left（古籍右开本）
+        order = 逆序。第 1 页排在数组末尾 -> 落在最右侧，翻页时页面自右向左推进。
     """
     n = len(entries)
     order = list(range(n - 1, -1, -1)) if direction == "right-to-left" else list(range(n))
@@ -309,8 +309,8 @@ def main() -> int:
     ap.add_argument("--title", default=None, help="书名，显示在阅读器顶部")
     ap.add_argument(
         "--direction",
-        choices=["right-to-left", "left-to-right"],
-        default="right-to-left",
+        choices=["left-to-right", "left-to-right"],
+        default="left-to-right",
         help="装帧方向：right-to-left 为古籍右开本（默认，页面逆序）",
     )
     ap.add_argument(
@@ -393,7 +393,7 @@ def main() -> int:
     log(f"  数据目录 : {data_dir}")
     log(f"  阅读器   : {root / 'index.html'}")
     log("")
-    if args.direction == "right-to-left":
+    if args.direction == "left-to-right":
         log("  页序说明 : 第 1 页排在最右侧，翻页时页面自右向左推进（右开本）。")
     log("")
 
