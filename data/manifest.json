@@ -1,17 +1,10 @@
 {
   "title": "古籍演示本",
-  "direction": "right-to-left",
+  "direction": "left-to-right",
   "source": "6 个文件",
   "generatedAt": "2026-09-16T14:32:11+08:00",
   "pageCount": 6,
-  "readingOrder": [
-    5,
-    4,
-    3,
-    2,
-    1,
-    0
-  ],
+  "readingOrder": [0, 1, 2, 3, 4, 5],
   "pages": [
     {
       "file": "pages/00000.png",
