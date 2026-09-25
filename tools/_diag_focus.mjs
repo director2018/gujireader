@@ -229,6 +229,59 @@ await sleep(2000);
 st = await evalJs(`JSON.stringify(window.gushiReader.state())`).then(JSON.parse);
 check(st.focus === true && st.focusScope === "2", "重载后沿用「两页聚焦」");
 
+// 10) 聚焦居中：聚焦范围（一页/两页）始终停在舞台正中
+// 计算方式：聚焦页集合的包围盒中点 应等于 舞台可视区中点（容差 3px）
+const centerProbe = `(() => {
+  const stage = document.getElementById("stage");
+  const sr = stage.getBoundingClientRect();
+  const els = [...document.querySelectorAll(".page.focus-cur")];
+  if (!els.length) return JSON.stringify({ ok:false, why:"no focus marks" });
+  let lo = Infinity, hi = -Infinity;
+  for (const el of els){
+    const r = el.getBoundingClientRect();
+    lo = Math.min(lo, r.left); hi = Math.max(hi, r.right);
+  }
+  return JSON.stringify({ ok:true, diff: Math.abs((lo+hi)/2 - (sr.left+sr.right)/2) });
+})()`;
+
+await sleep(600); // 等重载后的首次定位完成
+st = await evalJs(centerProbe).then(JSON.parse);
+check(st.ok && st.diff <= 3, `两页聚焦：整跨居中（偏差 ${st.ok ? st.diff.toFixed(1) : st.why}px）`);
+
+// 同跨内翻页，画面应保持稳定（transform 不变）
+// 注意先显式定位到某跨（重载后书签可能恢复在任意页，直接 goTo 会是换跨）
+await evalJs(`window.goTo(2, false)`);
+await sleep(600);
+st = await evalJs(`JSON.stringify((() => {
+  const before = document.getElementById("track").style.transform;
+  window.goTo(3, false);
+  return { before, after: document.getElementById("track").style.transform };
+})())`).then(JSON.parse);
+check(st.before === st.after, `同跨内翻页画面不挪动（${st.before} → ${st.after}）`);
+
+// 换一跨，整体平移后新跨仍居中
+await sleep(600);
+st = await evalJs(centerProbe).then(JSON.parse);
+check(st.ok && st.diff <= 3, `翻页后聚焦跨仍然居中（偏差 ${st.ok ? st.diff.toFixed(1) : st.why}px）`);
+
+// 切回一页档：当前页应立即单独居中
+await evalJs(`window.gushiReader.setFocusScope("1")`);
+await sleep(600);
+st = await evalJs(centerProbe).then(JSON.parse);
+check(st.ok && st.diff <= 3, `一页聚焦：当前页居中（偏差 ${st.ok ? st.diff.toFixed(1) : st.why}px）`);
+
+// 翻页后新一页跟到中间
+await evalJs(`window.goTo(1, false)`);
+await sleep(600);
+st = await evalJs(centerProbe).then(JSON.parse);
+check(st.ok && st.diff <= 3, `一页聚焦翻页后新页居中（偏差 ${st.ok ? st.diff.toFixed(1) : st.why}px）`);
+
+// 关闭聚焦：恢复以当前页为中心的普通定位
+await evalJs(`window.gushiReader.setFocus(false)`);
+await sleep(600);
+st = await evalJs(centerProbe).then(JSON.parse);
+check(!st.ok || st.diff <= 3, "关闭聚焦后定位仍正常（当前页居中）");
+
 console.log("\n右翻书古籍阅读器 · 聚焦（一页 / 两页）验证");
 console.log("=".repeat(40));
 out.forEach((l) => console.log(l));
